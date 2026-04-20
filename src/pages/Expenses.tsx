@@ -228,11 +228,13 @@ function ExpenseDialog({
       const ids = Array.from(selected);
       let splits: Split[] = [];
       if (splitType === "equal") {
-        const each = Math.floor((numericAmount / ids.length) * 100) / 100;
-        const remainder = Math.round((numericAmount - each * ids.length) * 100) / 100;
+        const totalCents = Math.round(numericAmount * 100);
+        const baseCents = Math.floor(totalCents / ids.length);
+        const remainderCents = totalCents - baseCents * ids.length;
         splits = ids.map((id, i) => ({
           roommate_id: id,
-          amount: i === 0 ? Math.round((each + remainder) * 100) / 100 : each,
+          // Distribute the leftover cents one-by-one to the first N roommates
+          amount: (baseCents + (i < remainderCents ? 1 : 0)) / 100,
         }));
       } else {
         splits = ids.map(id => ({ roommate_id: id, amount: parseFloat(manual[id]) || 0 }));
