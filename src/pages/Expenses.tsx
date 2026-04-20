@@ -66,7 +66,8 @@ export default function ExpensesPage() {
     onSuccess: () => {
       toast.success("Expense deleted");
       qc.invalidateQueries({ queryKey: ["expenses"] });
-      qc.invalidateQueries({ queryKey: ["splits-all"] });
+      qc.invalidateQueries({ queryKey: ["balances"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -274,7 +275,8 @@ function ExpenseDialog({
     onSuccess: () => {
       toast.success(editing ? "Expense updated" : "Expense added");
       qc.invalidateQueries({ queryKey: ["expenses"] });
-      qc.invalidateQueries({ queryKey: ["splits-all"] });
+      qc.invalidateQueries({ queryKey: ["balances"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
       onOpenChange(false);
     },
     onError: (e: Error) => toast.error(e.message),
