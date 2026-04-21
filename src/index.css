@@ -110,7 +110,14 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
-  body {
+  html, body, #root {
     @apply bg-background text-foreground;
+    min-height: 100dvh;
+  }
+
+  /* Disable rubber-band/elastic on iOS web app while keeping inner scroll. */
+  body {
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
   }
 }

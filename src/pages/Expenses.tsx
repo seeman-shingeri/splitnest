@@ -11,12 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, Pencil, Trash2, Loader2, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/currency";
+import { notifyGroup } from "@/lib/notify";
 
 const CATEGORIES = ["Rent", "Electricity", "Water", "Internet", "Groceries", "Maintenance", "Other"];
 
@@ -50,7 +50,9 @@ export default function ExpensesPage() {
     queryFn: async (): Promise<Expense[]> => {
       const { data, error } = await supabase.from("expenses")
         .select("id, title, amount, category, expense_date, paid_by, split_type, notes")
-        .eq("group_id", group!.id).order("expense_date", { ascending: false });
+        .eq("group_id", group!.id)
+        .order("expense_date", { ascending: false })
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []).map((e: any) => ({ ...e, amount: Number(e.amount) }));
     },
@@ -59,9 +61,12 @@ export default function ExpensesPage() {
   const roommateName = (id: string) => roommates?.find(r => r.id === id)?.full_name ?? "—";
 
   const del = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("expenses").delete().eq("id", id);
+    mutationFn: async (e: Expense) => {
+      const { error } = await supabase.from("expenses").delete().eq("id", e.id);
       if (error) throw error;
+      if (group?.id) {
+        await notifyGroup(group.id, "expense_deleted", "Expense removed", `${e.title} (${formatCurrency(e.amount)}) was deleted`);
+      }
     },
     onSuccess: () => {
       toast.success("Expense deleted");
@@ -75,69 +80,71 @@ export default function ExpensesPage() {
   const isOwner = group?.isOwner;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Expenses</h1>
-          <p className="text-muted-foreground">Track and split shared costs</p>
+          <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
+          <p className="text-sm text-muted-foreground">Track and split shared costs</p>
         </div>
         {isOwner && (
-          <Button onClick={() => { setEditing(null); setOpen(true); }} disabled={!roommates?.length}>
-            <Plus className="mr-2 h-4 w-4" /> Add expense
+          <Button size="sm" onClick={() => { setEditing(null); setOpen(true); }} disabled={!roommates?.length}>
+            <Plus className="mr-1 h-4 w-4" /> Add
           </Button>
         )}
       </div>
 
       {!roommates?.length && (
-        <Card><CardContent className="p-6 text-center text-muted-foreground">
+        <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">
           Add at least one roommate before creating expenses.
         </CardContent></Card>
       )}
 
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-          ) : !expenses?.length ? (
-            <div className="flex flex-col items-center gap-3 p-12 text-center">
-              <Receipt className="h-10 w-10 text-muted-foreground" />
-              <p className="text-muted-foreground">No expenses yet</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="hidden md:table-cell">Paid by</TableHead>
-                  <TableHead className="hidden md:table-cell">Date</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  {isOwner && <TableHead className="w-24" />}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {expenses.map((e) => (
-                  <TableRow key={e.id}>
-                    <TableCell className="font-medium">{e.title}</TableCell>
-                    <TableCell><Badge variant="secondary">{e.category}</Badge></TableCell>
-                    <TableCell className="hidden md:table-cell">{roommateName(e.paid_by)}</TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">{format(new Date(e.expense_date), "MMM d, yyyy")}</TableCell>
-                    <TableCell className="text-right font-semibold">{formatCurrency(e.amount)}</TableCell>
-                    {isOwner && (
-                      <TableCell className="text-right">
-                        <Button size="icon" variant="ghost" onClick={() => { setEditing(e); setOpen(true); }}><Pencil className="h-4 w-4" /></Button>
-                        <Button size="icon" variant="ghost" onClick={() => { if (confirm(`Delete ${e.title}?`)) del.mutate(e.id); }}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {isLoading ? (
+        <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+      ) : !expenses?.length ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
+            <Receipt className="h-10 w-10 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No expenses yet</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <ul className="space-y-2">
+          {expenses.map((e) => (
+            <li key={e.id}>
+              <Card>
+                <CardContent className="flex items-start gap-3 p-3.5">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+                    <Receipt className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="truncate font-medium">{e.title}</span>
+                      <span className="shrink-0 font-semibold tabular-nums">{formatCurrency(e.amount)}</span>
+                    </div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Badge variant="secondary" className="font-normal">{e.category}</Badge>
+                      <span className="truncate text-[11px] text-muted-foreground">
+                        {roommateName(e.paid_by)} · {format(new Date(e.expense_date), "MMM d")}
+                      </span>
+                    </div>
+                  </div>
+                  {isOwner && (
+                    <div className="flex shrink-0 flex-col gap-0.5">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditing(e); setOpen(true); }}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { if (confirm(`Delete ${e.title}?`)) del.mutate(e); }}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <ExpenseDialog
         open={open}
@@ -170,7 +177,6 @@ function ExpenseDialog({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [manual, setManual] = useState<Record<string, string>>({});
 
-  // Load existing splits when editing
   const { data: existingSplits } = useQuery({
     queryKey: ["splits", editing?.id],
     enabled: !!editing && open,
@@ -225,7 +231,6 @@ function ExpenseDialog({
       if (!paidBy) throw new Error("Select who paid");
       if (selected.size === 0) throw new Error("Select at least one roommate to split with");
 
-      // Build split rows
       const ids = Array.from(selected);
       let splits: Split[] = [];
       if (splitType === "equal") {
@@ -234,7 +239,6 @@ function ExpenseDialog({
         const remainderCents = totalCents - baseCents * ids.length;
         splits = ids.map((id, i) => ({
           roommate_id: id,
-          // Distribute the leftover cents one-by-one to the first N roommates
           amount: (baseCents + (i < remainderCents ? 1 : 0)) / 100,
         }));
       } else {
@@ -271,12 +275,21 @@ function ExpenseDialog({
         .from("expense_splits")
         .insert(splits.map(s => ({ ...s, expense_id: expenseId })));
       if (spErr) throw spErr;
+
+      // Notify group members
+      await notifyGroup(
+        groupId,
+        editing ? "expense_updated" : "expense_added",
+        editing ? "Expense updated" : "New expense added",
+        `${title.trim()} — ${formatCurrency(numericAmount)}`
+      );
     },
     onSuccess: () => {
       toast.success(editing ? "Expense updated" : "Expense added");
       qc.invalidateQueries({ queryKey: ["expenses"] });
       qc.invalidateQueries({ queryKey: ["balances"] });
       qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      qc.invalidateQueries({ queryKey: ["reports"] });
       onOpenChange(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -291,7 +304,7 @@ function ExpenseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[92vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editing ? "Edit expense" : "Add expense"}</DialogTitle>
         </DialogHeader>
@@ -303,7 +316,7 @@ function ExpenseDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Amount *</Label>
-              <Input type="number" step="0.01" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+              <Input type="number" inputMode="decimal" step="0.01" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label>Date</Label>
@@ -349,10 +362,10 @@ function ExpenseDialog({
                 return (
                   <div key={r.id} className="flex items-center gap-3">
                     <Checkbox checked={checked} onCheckedChange={() => toggleSelect(r.id)} />
-                    <span className="flex-1 text-sm">{r.full_name}</span>
+                    <span className="flex-1 truncate text-sm">{r.full_name}</span>
                     {splitType === "manual" && checked && (
                       <Input
-                        type="number" step="0.01" min="0"
+                        type="number" inputMode="decimal" step="0.01" min="0"
                         className="h-8 w-28"
                         placeholder="0.00"
                         value={manual[r.id] ?? ""}
