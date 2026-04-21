@@ -157,6 +157,102 @@ export type Database = {
         }
         Relationships: []
       }
+      meal_entries: {
+        Row: {
+          breakfast: number
+          created_at: string
+          created_by: string | null
+          dinner: number
+          entry_date: string
+          group_id: string
+          id: string
+          lunch: number
+          roommate_id: string
+          updated_at: string
+        }
+        Insert: {
+          breakfast?: number
+          created_at?: string
+          created_by?: string | null
+          dinner?: number
+          entry_date?: string
+          group_id: string
+          id?: string
+          lunch?: number
+          roommate_id: string
+          updated_at?: string
+        }
+        Update: {
+          breakfast?: number
+          created_at?: string
+          created_by?: string | null
+          dinner?: number
+          entry_date?: string
+          group_id?: string
+          id?: string
+          lunch?: number
+          roommate_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      meal_settings: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          meal_charge: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          meal_charge?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          meal_charge?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          group_id: string
+          id: string
+          read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          group_id: string
+          id?: string
+          read?: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          group_id?: string
+          id?: string
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       referral_codes: {
         Row: {
           code: string
@@ -232,6 +328,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      settlement_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          from_roommate_id: string
+          group_id: string
+          id: string
+          notes: string | null
+          paid_at: string
+          to_roommate_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          from_roommate_id: string
+          group_id: string
+          id?: string
+          notes?: string | null
+          paid_at?: string
+          to_roommate_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          from_roommate_id?: string
+          group_id?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string
+          to_roommate_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {
