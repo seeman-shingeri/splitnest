@@ -13,6 +13,10 @@ import Roommates from "./pages/Roommates";
 import Expenses from "./pages/Expenses";
 import Settlements from "./pages/Settlements";
 import Referral from "./pages/Referral";
+import Meals from "./pages/Meals";
+import Reports from "./pages/Reports";
+import Notifications from "./pages/Notifications";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -21,7 +25,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
-      <Sonner />
+      <Sonner position="top-center" />
       <BrowserRouter>
         <AuthProvider>
           <Routes>
@@ -31,8 +35,12 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/roommates" element={<Roommates />} />
               <Route path="/expenses" element={<Expenses />} />
+              <Route path="/meals" element={<Meals />} />
+              <Route path="/reports" element={<Reports />} />
               <Route path="/settlements" element={<Settlements />} />
               <Route path="/referral" element={<Referral />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/profile" element={<Profile />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
