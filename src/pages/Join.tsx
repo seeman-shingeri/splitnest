@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, Ticket } from "lucide-react";
+import { notifyGroup } from "@/lib/notify";
 
 export default function JoinPage() {
   const { user, loading } = useAuth();
@@ -50,8 +51,8 @@ export default function JoinPage() {
         .insert({ group_id: rc.group_id, user_id: user.id, role: "member" });
       if (memErr && !memErr.message.includes("duplicate")) throw memErr;
 
-      // Auto-generate a fresh code for that group (best-effort; may be blocked by RLS for non-owner — ignored)
-      // Owner-only via RLS, so skip from this client.
+      // Notify group that someone joined via referral
+      await notifyGroup(rc.group_id, "referral_used", "New member joined", `Someone joined using code ${trimmed}`);
 
       toast.success("You've joined the group!");
       navigate("/", { replace: true });
