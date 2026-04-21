@@ -7,8 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Loader2, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Users, Phone, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -75,8 +74,9 @@ export default function RoommatesPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Roommate deleted");
+      toast.success("Roommate removed");
       qc.invalidateQueries({ queryKey: ["roommates"] });
+      qc.invalidateQueries({ queryKey: ["balances"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -95,73 +95,69 @@ export default function RoommatesPage() {
   const isOwner = group?.isOwner;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Roommates</h1>
-          <p className="text-muted-foreground">Manage people in your group</p>
+          <h1 className="text-2xl font-bold tracking-tight">Roommates</h1>
+          <p className="text-sm text-muted-foreground">Manage people in your group</p>
         </div>
         {isOwner && (
-          <Button onClick={openNew}>
-            <Plus className="mr-2 h-4 w-4" /> Add roommate
+          <Button size="sm" onClick={openNew}>
+            <Plus className="mr-1 h-4 w-4" /> Add
           </Button>
         )}
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-          ) : !roommates?.length ? (
-            <div className="flex flex-col items-center gap-3 p-12 text-center">
-              <Users className="h-10 w-10 text-muted-foreground" />
-              <p className="text-muted-foreground">No roommates yet</p>
-              {isOwner && <Button onClick={openNew} variant="outline"><Plus className="mr-2 h-4 w-4" />Add your first roommate</Button>}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Room</TableHead>
-                  <TableHead className="hidden md:table-cell">Phone</TableHead>
-                  <TableHead className="hidden md:table-cell">Joined</TableHead>
-                  {isOwner && <TableHead className="w-24 text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {roommates.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.full_name}</TableCell>
-                    <TableCell>{r.room_number}</TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">{r.phone ?? "—"}</TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">{format(new Date(r.join_date), "MMM d, yyyy")}</TableCell>
-                    {isOwner && (
-                      <TableCell className="text-right">
-                        <Button size="icon" variant="ghost" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
-                        <Button size="icon" variant="ghost" onClick={() => { if (confirm(`Delete ${r.full_name}?`)) del.mutate(r.id); }}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {isLoading ? (
+        <div className="flex justify-center p-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+      ) : !roommates?.length ? (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
+            <Users className="h-10 w-10 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No roommates yet</p>
+            {isOwner && <Button onClick={openNew} variant="outline" size="sm"><Plus className="mr-1 h-4 w-4" />Add the first roommate</Button>}
+          </CardContent>
+        </Card>
+      ) : (
+        <ul className="space-y-2">
+          {roommates.map((r) => (
+            <li key={r.id}>
+              <Card>
+                <CardContent className="flex items-center gap-3 p-3.5">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent text-sm font-semibold text-accent-foreground">
+                    {r.full_name.split(" ").map(s => s[0]).slice(0, 2).join("").toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate font-medium">{r.full_name}</span>
+                      <span className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">Room {r.room_number}</span>
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground">
+                      {r.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{r.phone}</span>}
+                      <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(r.join_date), "MMM yyyy")}</span>
+                    </div>
+                  </div>
+                  {isOwner && (
+                    <div className="flex shrink-0 gap-0.5">
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(r)}><Pencil className="h-4 w-4" /></Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { if (confirm(`Remove ${r.full_name}?`)) del.mutate(r.id); }}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editing ? "Edit roommate" : "Add roommate"}</DialogTitle>
           </DialogHeader>
-          <form
-            id="rm-form"
-            className="space-y-4"
-            onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
-          >
+          <form id="rm-form" className="space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
             <div className="space-y-2">
               <Label>Full name *</Label>
               <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
@@ -173,7 +169,7 @@ export default function RoommatesPage() {
               </div>
               <div className="space-y-2">
                 <Label>Phone</Label>
-                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <Input inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
               </div>
             </div>
             <div className="space-y-2">
