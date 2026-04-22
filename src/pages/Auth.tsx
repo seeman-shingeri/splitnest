@@ -60,8 +60,8 @@ export default function AuthPage() {
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <Home className="h-6 w-6" />
           </div>
-          <CardTitle className="text-2xl">RoomLedger</CardTitle>
-          <CardDescription>Manage shared expenses with your roommates</CardDescription>
+          <CardTitle className="text-2xl">SplitNest</CardTitle>
+          <CardDescription>Shared living finance, simplified</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="signin">

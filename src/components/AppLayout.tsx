@@ -31,7 +31,7 @@ export function AppLayout() {
     "/profile": "Profile",
     "/notifications": "Notifications",
   };
-  const headerTitle = titleMap[location.pathname] ?? "RoomLedger";
+  const headerTitle = titleMap[location.pathname] ?? "SplitNest";
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
