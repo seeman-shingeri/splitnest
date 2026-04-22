@@ -134,7 +134,9 @@ export default function RoommatesPage() {
                     </div>
                     <div className="mt-0.5 flex items-center gap-3 text-[11px] text-muted-foreground">
                       {r.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{r.phone}</span>}
-                      <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(r.join_date), "MMM yyyy")}</span>
+                      {r.join_date && !isNaN(new Date(r.join_date).getTime()) && (
+                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(r.join_date), "MMM yyyy")}</span>
+                      )}
                     </div>
                   </div>
                   {isOwner && (
