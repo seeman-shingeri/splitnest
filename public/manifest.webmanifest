@@ -1,7 +1,7 @@
 {
-  "name": "RoomLedger — Roommate Expense & Meal Manager",
-  "short_name": "RoomLedger",
-  "description": "Track shared roommate expenses, meals, and settle up automatically.",
+  "name": "SplitNest — Shared Living Finance",
+  "short_name": "SplitNest",
+  "description": "SplitNest helps roommates track shared expenses, meals, and settle up automatically.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
