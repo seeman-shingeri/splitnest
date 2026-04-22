@@ -38,8 +38,14 @@ export default function ReferralPage() {
   const generate = useMutation({
     mutationFn: async () => {
       if (!group) throw new Error("No group");
-      // Invalidate any existing unused codes (set used=true so only one is active)
-      await supabase.from("referral_codes").update({ used: true }).eq("group_id", group.id).eq("used", false);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      // Invalidate any existing unused codes (mark as used by the owner so only one is active)
+      await supabase
+        .from("referral_codes")
+        .update({ used: true, used_by: user.id, used_at: new Date().toISOString() })
+        .eq("group_id", group.id)
+        .eq("used", false);
       const newCode = generateCode();
       const { error } = await supabase.from("referral_codes").insert({ group_id: group.id, code: newCode });
       if (error) throw error;

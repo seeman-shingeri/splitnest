@@ -23,9 +23,6 @@ export function useRealtimeSync(groupId: string | undefined, userId: string | un
         qc.invalidateQueries({ queryKey: ["balances"] });
         qc.invalidateQueries({ queryKey: ["splits"] });
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "roommates", filter: `group_id=eq.${groupId}` }, () => {
-        qc.invalidateQueries({ queryKey: ["roommates"] });
-      })
       .on("postgres_changes", { event: "*", schema: "public", table: "meal_entries", filter: `group_id=eq.${groupId}` }, () => {
         qc.invalidateQueries({ queryKey: ["meal-entries"] });
         qc.invalidateQueries({ queryKey: ["meal-summary"] });
