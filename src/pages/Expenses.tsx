@@ -173,7 +173,7 @@ function ExpenseDialog({
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [paidBy, setPaidBy] = useState("");
   const [notes, setNotes] = useState("");
-  const [splitType, setSplitType] = useState<"equal" | "manual">("equal");
+  const [splitType, setSplitType] = useState<"equal" | "manual" | "meal_points">("equal");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [manual, setManual] = useState<Record<string, string>>({});
 
