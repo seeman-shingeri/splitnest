@@ -51,6 +51,8 @@ export default function JoinPage() {
         .insert({ group_id: rc.group_id, user_id: user.id, role: "member" });
       if (memErr && !memErr.message.includes("duplicate")) throw memErr;
 
+      // A DB trigger auto-generates a fresh referral code for the owner.
+
       // Notify group that someone joined via referral
       await notifyGroup(rc.group_id, "referral_used", "New member joined", `Someone joined using code ${trimmed}`);
 
