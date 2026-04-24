@@ -276,6 +276,22 @@ function ExpenseDialog({
           roommate_id: id,
           amount: (baseCents + (i < remainderCents ? 1 : 0)) / 100,
         }));
+      } else if (splitType === "meal_points") {
+        const points = ids.map(id => mealPoints?.get(id) || 0);
+        const totalPts = points.reduce((s, n) => s + n, 0);
+        if (totalPts <= 0) {
+          throw new Error("No meal points recorded for this month — log meals first or pick another split type.");
+        }
+        const totalCents = Math.round(numericAmount * 100);
+        // Largest-remainder distribution to ensure cents sum exactly
+        const raw = points.map(p => (p / totalPts) * totalCents);
+        const floors = raw.map(v => Math.floor(v));
+        let remainder = totalCents - floors.reduce((s, n) => s + n, 0);
+        const order = raw
+          .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+          .sort((a, b) => b.frac - a.frac);
+        for (let k = 0; k < remainder; k++) floors[order[k].i]++;
+        splits = ids.map((id, i) => ({ roommate_id: id, amount: floors[i] / 100 }));
       } else {
         splits = ids.map(id => ({ roommate_id: id, amount: parseFloat(manual[id]) || 0 }));
         const total = splits.reduce((s, x) => s + x.amount, 0);
