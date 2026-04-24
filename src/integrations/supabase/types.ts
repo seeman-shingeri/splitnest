@@ -378,6 +378,7 @@ export type Database = {
         Args: { _group_id: string; _user_id: string }
         Returns: boolean
       }
+      redeem_referral_code: { Args: { _code: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
