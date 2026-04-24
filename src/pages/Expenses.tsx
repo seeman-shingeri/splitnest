@@ -208,6 +208,12 @@ function ExpenseDialog({
     }
   }, [open, editing, roommates]);
 
+  // Auto-suggest meal-points split when picking Groceries (only on a fresh form)
+  useEffect(() => {
+    if (!open || editing) return;
+    if (category === "Groceries") setSplitType("meal_points");
+  }, [category, open, editing]);
+
   useEffect(() => {
     if (editing && existingSplits) {
       setSelected(new Set(existingSplits.map(s => s.roommate_id)));
@@ -216,6 +222,35 @@ function ExpenseDialog({
       setManual(m);
     }
   }, [existingSplits, editing]);
+
+  // Meal points for the month of the expense — used when split type is meal_points
+  const monthKey = useMemo(() => {
+    const d = date ? parseISO(date) : new Date();
+    return {
+      start: format(startOfMonth(d), "yyyy-MM-dd"),
+      end: format(endOfMonth(d), "yyyy-MM-dd"),
+    };
+  }, [date]);
+
+  const { data: mealPoints } = useQuery({
+    queryKey: ["meal-points-for-split", groupId, monthKey.start, monthKey.end],
+    enabled: !!groupId && open,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("meal_entries")
+        .select("roommate_id, breakfast, lunch, dinner")
+        .eq("group_id", groupId!)
+        .gte("entry_date", monthKey.start)
+        .lte("entry_date", monthKey.end);
+      if (error) throw error;
+      const map = new Map<string, number>();
+      (data || []).forEach((e: any) => {
+        const t = (e.breakfast || 0) + (e.lunch || 0) + (e.dinner || 0);
+        map.set(e.roommate_id, (map.get(e.roommate_id) || 0) + t);
+      });
+      return map;
+    },
+  });
 
   const numericAmount = parseFloat(amount) || 0;
   const manualTotal = useMemo(() =>
