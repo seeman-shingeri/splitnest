@@ -27,34 +27,16 @@ export default function JoinPage() {
     if (!trimmed) return toast.error("Enter a referral code");
     setBusy(true);
     try {
-      // Find unused code
-      const { data: rc, error: rcErr } = await supabase
-        .from("referral_codes")
-        .select("id, group_id, used")
-        .eq("code", trimmed)
-        .maybeSingle();
-      if (rcErr) throw rcErr;
-      if (!rc) throw new Error("Invalid referral code");
-      if (rc.used) throw new Error("This referral code has already been used");
-
-      // Mark code as used
-      const { error: updErr } = await supabase
-        .from("referral_codes")
-        .update({ used: true, used_by: user.id, used_at: new Date().toISOString() })
-        .eq("id", rc.id)
-        .eq("used", false);
-      if (updErr) throw updErr;
-
-      // Add membership
-      const { error: memErr } = await supabase
-        .from("group_members")
-        .insert({ group_id: rc.group_id, user_id: user.id, role: "member" });
-      if (memErr && !memErr.message.includes("duplicate")) throw memErr;
-
-      // A DB trigger auto-generates a fresh referral code for the owner.
+      // Atomic: validates code, marks it used, inserts membership, returns group_id.
+      // A DB trigger then auto-generates a fresh referral code for the owner.
+      const { data: groupId, error: rpcErr } = await supabase.rpc("redeem_referral_code", {
+        _code: trimmed,
+      });
+      if (rpcErr) throw rpcErr;
+      if (!groupId) throw new Error("Failed to join group");
 
       // Notify group that someone joined via referral
-      await notifyGroup(rc.group_id, "referral_used", "New member joined", `Someone joined using code ${trimmed}`);
+      await notifyGroup(groupId as string, "referral_used", "New member joined", `Someone joined using code ${trimmed}`);
 
       toast.success("You've joined the group!");
       navigate("/", { replace: true });
