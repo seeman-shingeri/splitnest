@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -10,34 +10,43 @@ import { toast } from "sonner";
 import { Loader2, Ticket } from "lucide-react";
 import { notifyGroup } from "@/lib/notify";
 
+const PENDING_CODE_KEY = "splitnest:pendingReferralCode";
+
 export default function JoinPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
+  const autoRedeemRan = useRef(false);
 
+  // Pre-fill the input from a previously-saved code (from before sign-in)
   useEffect(() => {
-    if (!loading && !user) navigate("/auth", { replace: true });
-  }, [user, loading, navigate]);
+    const pending = sessionStorage.getItem(PENDING_CODE_KEY);
+    if (pending) setCode(pending);
+  }, []);
 
-  const handleJoin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    const trimmed = code.trim().toUpperCase();
-    if (!trimmed) return toast.error("Enter a referral code");
+  const redeem = async (rawCode: string) => {
+    const trimmed = rawCode.trim().toUpperCase();
+    if (!trimmed) {
+      toast.error("Enter a referral code");
+      return;
+    }
     setBusy(true);
     try {
-      // Atomic: validates code, marks it used, inserts membership, returns group_id.
-      // A DB trigger then auto-generates a fresh referral code for the owner.
       const { data: groupId, error: rpcErr } = await supabase.rpc("redeem_referral_code", {
         _code: trimmed,
       });
       if (rpcErr) throw rpcErr;
       if (!groupId) throw new Error("Failed to join group");
 
-      // Notify group that someone joined via referral
-      await notifyGroup(groupId as string, "referral_used", "New member joined", `Someone joined using code ${trimmed}`);
+      await notifyGroup(
+        groupId as string,
+        "referral_used",
+        "New member joined",
+        `Someone joined using code ${trimmed}`,
+      );
 
+      sessionStorage.removeItem(PENDING_CODE_KEY);
       toast.success("You've joined the group!");
       navigate("/", { replace: true });
     } catch (err: any) {
@@ -45,6 +54,33 @@ export default function JoinPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  // If user signs in and we have a pending code, auto-redeem it
+  useEffect(() => {
+    if (loading || !user || autoRedeemRan.current) return;
+    const pending = sessionStorage.getItem(PENDING_CODE_KEY);
+    if (pending) {
+      autoRedeemRan.current = true;
+      redeem(pending);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, loading]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed) return toast.error("Enter a referral code");
+
+    if (!user) {
+      // Save code and send them to sign in / sign up
+      sessionStorage.setItem(PENDING_CODE_KEY, trimmed);
+      toast.info("Sign in or create an account to join the group");
+      navigate("/auth", { replace: false });
+      return;
+    }
+
+    await redeem(trimmed);
   };
 
   return (
@@ -58,10 +94,14 @@ export default function JoinPage() {
             <Ticket className="h-6 w-6" />
           </div>
           <CardTitle>Join a group</CardTitle>
-          <CardDescription>Enter the referral code your group owner shared with you</CardDescription>
+          <CardDescription>
+            {user
+              ? "Enter the referral code your group owner shared with you"
+              : "Enter your code — you'll sign in or sign up next, then we'll add you to the group"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleJoin} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="code">Referral code</Label>
               <Input
@@ -72,14 +112,25 @@ export default function JoinPage() {
                 className="text-center font-mono text-lg tracking-widest"
                 maxLength={16}
                 required
+                autoFocus
               />
             </div>
-            <Button type="submit" className="w-full" disabled={busy}>
-              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Join group
+            <Button type="submit" className="w-full" disabled={busy || loading}>
+              {(busy || loading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {user ? "Join group" : "Continue"}
             </Button>
-            <Button type="button" variant="ghost" className="w-full" onClick={() => navigate("/")}>
-              Skip
-            </Button>
+            {user ? (
+              <Button type="button" variant="ghost" className="w-full" onClick={() => navigate("/")}>
+                Skip
+              </Button>
+            ) : (
+              <div className="text-center text-sm text-muted-foreground">
+                Already have an account?{" "}
+                <Link to="/auth" className="text-primary hover:underline">
+                  Sign in
+                </Link>
+              </div>
+            )}
           </form>
         </CardContent>
       </Card>
