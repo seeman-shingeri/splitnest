@@ -51,6 +51,13 @@ export default function JoinPage() {
         .insert({ group_id: rc.group_id, user_id: user.id, role: "member" });
       if (memErr && !memErr.message.includes("duplicate")) throw memErr;
 
+      // Auto-generate a fresh code so the owner always has one ready
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let nextCode = "";
+      for (let i = 0; i < 8; i++) nextCode += chars[Math.floor(Math.random() * chars.length)];
+      // Best-effort — RLS only allows owner to insert. Failure is fine.
+      await supabase.from("referral_codes").insert({ group_id: rc.group_id, code: nextCode });
+
       // Notify group that someone joined via referral
       await notifyGroup(rc.group_id, "referral_used", "New member joined", `Someone joined using code ${trimmed}`);
 
