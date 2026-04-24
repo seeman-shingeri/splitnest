@@ -398,11 +398,17 @@ function ExpenseDialog({
           <div className="space-y-2">
             <Label>Split type</Label>
             <Tabs value={splitType} onValueChange={(v) => setSplitType(v as any)}>
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="equal">Equal</TabsTrigger>
+                <TabsTrigger value="meal_points">Meal pts</TabsTrigger>
                 <TabsTrigger value="manual">Manual</TabsTrigger>
               </TabsList>
             </Tabs>
+            {splitType === "meal_points" && (
+              <p className="text-[11px] text-muted-foreground">
+                Splits proportionally to each roommate's meal points for {format(parseISO(monthKey.start), "MMM yyyy")}.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2 rounded-lg border p-3">
@@ -410,6 +416,11 @@ function ExpenseDialog({
             <div className="space-y-2">
               {roommates.map(r => {
                 const checked = selected.has(r.id);
+                const pts = mealPoints?.get(r.id) || 0;
+                const totalPts = Array.from(selected).reduce((s, id) => s + (mealPoints?.get(id) || 0), 0);
+                const mpShare = splitType === "meal_points" && totalPts > 0 && checked
+                  ? (pts / totalPts) * numericAmount
+                  : 0;
                 return (
                   <div key={r.id} className="flex items-center gap-3">
                     <Checkbox checked={checked} onCheckedChange={() => toggleSelect(r.id)} />
@@ -426,6 +437,12 @@ function ExpenseDialog({
                     {splitType === "equal" && checked && selected.size > 0 && numericAmount > 0 && (
                       <span className="text-xs text-muted-foreground">{formatCurrency(numericAmount / selected.size)}</span>
                     )}
+                    {splitType === "meal_points" && checked && (
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {pts} pt{pts === 1 ? "" : "s"}
+                        {numericAmount > 0 && totalPts > 0 && ` · ${formatCurrency(mpShare)}`}
+                      </span>
+                    )}
                   </div>
                 );
               })}
@@ -434,6 +451,11 @@ function ExpenseDialog({
               <div className={`mt-2 flex justify-between text-xs ${Math.abs(manualTotal - numericAmount) > 0.01 ? "text-destructive" : "text-success"}`}>
                 <span>Total split: {formatCurrency(manualTotal)}</span>
                 <span>Expense: {formatCurrency(numericAmount)}</span>
+              </div>
+            )}
+            {splitType === "meal_points" && selected.size > 0 && (
+              <div className="mt-2 text-[11px] text-muted-foreground">
+                Total meal points among selected: {Array.from(selected).reduce((s, id) => s + (mealPoints?.get(id) || 0), 0)}
               </div>
             )}
           </div>
