@@ -23,7 +23,7 @@ const CATEGORIES = ["Rent", "Electricity", "Water", "Internet", "Groceries", "Ma
 interface Roommate { id: string; full_name: string }
 interface Expense {
   id: string; title: string; amount: number; category: string; expense_date: string;
-  paid_by: string; split_type: "equal" | "manual"; notes: string | null;
+  paid_by: string; split_type: "equal" | "manual" | "meal_points"; notes: string | null;
 }
 interface Split { roommate_id: string; amount: number }
 
