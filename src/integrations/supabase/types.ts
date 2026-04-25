@@ -220,6 +220,45 @@ export type Database = {
         }
         Relationships: []
       }
+      member_profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          group_id: string
+          id: string
+          phone: string | null
+          preferred_payment_info: string | null
+          roommate_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          group_id: string
+          id?: string
+          phone?: string | null
+          preferred_payment_info?: string | null
+          roommate_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          group_id?: string
+          id?: string
+          phone?: string | null
+          preferred_payment_info?: string | null
+          roommate_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string | null
@@ -299,7 +338,8 @@ export type Database = {
           id: string
           join_date: string
           phone: string | null
-          room_number: string
+          room_number: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -308,7 +348,8 @@ export type Database = {
           id?: string
           join_date?: string
           phone?: string | null
-          room_number: string
+          room_number?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -317,7 +358,8 @@ export type Database = {
           id?: string
           join_date?: string
           phone?: string | null
-          room_number?: string
+          room_number?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -370,6 +412,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      complete_member_profile: {
+        Args: {
+          _full_name: string
+          _group_id: string
+          _phone?: string
+          _preferred_payment_info?: string
+        }
+        Returns: string
+      }
       is_group_member: {
         Args: { _group_id: string; _user_id: string }
         Returns: boolean
