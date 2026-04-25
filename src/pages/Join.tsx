@@ -9,8 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { Loader2, Ticket } from "lucide-react";
 import { notifyGroup } from "@/lib/notify";
-
-const PENDING_CODE_KEY = "splitnest:pendingReferralCode";
+import { clearPendingReferralCode, getPendingReferralCode, setPendingReferralCode } from "@/lib/join-flow";
 
 export default function JoinPage() {
   const { user, loading } = useAuth();
@@ -21,7 +20,7 @@ export default function JoinPage() {
 
   // Pre-fill the input from a previously-saved code (from before sign-in)
   useEffect(() => {
-    const pending = sessionStorage.getItem(PENDING_CODE_KEY);
+    const pending = getPendingReferralCode();
     if (pending) setCode(pending);
   }, []);
 
@@ -46,9 +45,9 @@ export default function JoinPage() {
         `Someone joined using code ${trimmed}`,
       );
 
-      sessionStorage.removeItem(PENDING_CODE_KEY);
+      clearPendingReferralCode();
       toast.success("You've joined the group!");
-      navigate("/", { replace: true });
+      navigate("/complete-profile", { replace: true });
     } catch (err: any) {
       toast.error(err.message ?? "Failed to join");
     } finally {
@@ -59,7 +58,7 @@ export default function JoinPage() {
   // If user signs in and we have a pending code, auto-redeem it
   useEffect(() => {
     if (loading || !user || autoRedeemRan.current) return;
-    const pending = sessionStorage.getItem(PENDING_CODE_KEY);
+    const pending = getPendingReferralCode();
     if (pending) {
       autoRedeemRan.current = true;
       redeem(pending);
@@ -74,7 +73,7 @@ export default function JoinPage() {
 
     if (!user) {
       // Save code and send them to sign in / sign up
-      sessionStorage.setItem(PENDING_CODE_KEY, trimmed);
+      setPendingReferralCode(trimmed);
       toast.info("Sign in or create an account to join the group");
       navigate("/auth", { replace: false });
       return;

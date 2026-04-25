@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Home, Loader2 } from "lucide-react";
+import { getPendingReferralCode } from "@/lib/join-flow";
 
 export default function AuthPage() {
   const navigate = useNavigate();
@@ -19,7 +20,8 @@ export default function AuthPage() {
   const [name, setName] = useState("");
 
   useEffect(() => {
-    if (user) navigate("/", { replace: true });
+    if (!user) return;
+    navigate(getPendingReferralCode() ? "/join" : "/", { replace: true });
   }, [user, navigate]);
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -29,7 +31,7 @@ export default function AuthPage() {
     setLoading(false);
     if (error) return toast.error(error.message);
     toast.success("Signed in");
-    navigate("/", { replace: true });
+    navigate(getPendingReferralCode() ? "/join" : "/", { replace: true });
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -41,13 +43,15 @@ export default function AuthPage() {
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
-        data: { group_name: name ? `${name}'s Group` : "My Group" },
+          data: getPendingReferralCode()
+            ? { skip_default_group: true }
+            : { group_name: name ? `${name}'s Group` : "My Group" },
       },
     });
     setLoading(false);
     if (error) return toast.error(error.message);
     toast.success("Account created — you're signed in");
-    navigate("/", { replace: true });
+    navigate(getPendingReferralCode() ? "/join" : "/", { replace: true });
   };
 
   return (

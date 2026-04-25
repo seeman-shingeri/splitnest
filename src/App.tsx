@@ -19,6 +19,7 @@ import Meals from "./pages/Meals";
 import Reports from "./pages/Reports";
 import Notifications from "./pages/Notifications";
 import Profile from "./pages/Profile";
+import CompleteProfile from "./pages/CompleteProfile";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
               <Route path="/reports" element={<Reports />} />
               <Route path="/settlements" element={<Settlements />} />
               <Route path="/referral" element={<Referral />} />
+              <Route path="/complete-profile" element={<CompleteProfile />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/profile" element={<Profile />} />
             </Route>
