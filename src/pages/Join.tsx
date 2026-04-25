@@ -46,6 +46,11 @@ export default function JoinPage() {
       );
 
       clearPendingReferralCode();
+      // Switch the active group to the one we just joined.
+      try {
+        const { setActiveGroupId } = await import("@/hooks/useGroup");
+        setActiveGroupId(groupId as string);
+      } catch {/* ignore */}
       toast.success("You've joined the group!");
       navigate("/complete-profile", { replace: true });
     } catch (err: any) {
@@ -119,16 +124,37 @@ export default function JoinPage() {
               {user ? "Join group" : "Continue"}
             </Button>
             {user ? (
-              <Button type="button" variant="ghost" className="w-full" onClick={() => navigate("/")}>
-                Skip
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => {
+                  clearPendingReferralCode();
+                  navigate("/", { replace: true });
+                }}
+              >
+                Skip for now
               </Button>
             ) : (
-              <div className="text-center text-sm text-muted-foreground">
-                Already have an account?{" "}
-                <Link to="/auth" className="text-primary hover:underline">
-                  Sign in
-                </Link>
-              </div>
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => {
+                    clearPendingReferralCode();
+                    navigate("/auth", { replace: true });
+                  }}
+                >
+                  Skip — sign in without a code
+                </Button>
+                <div className="text-center text-sm text-muted-foreground">
+                  Already have an account?{" "}
+                  <Link to="/auth" className="text-primary hover:underline">
+                    Sign in
+                  </Link>
+                </div>
+              </>
             )}
           </form>
         </CardContent>
