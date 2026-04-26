@@ -34,9 +34,14 @@ export default function ForgotPasswordPage() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center p-4"
+      className="relative flex min-h-screen items-center justify-center p-4"
       style={{ background: "var(--gradient-subtle)" }}
     >
+      <Button asChild variant="ghost" size="sm" className="absolute left-3 top-3">
+        <Link to="/auth" aria-label="Back to sign in">
+          <ArrowLeft className="mr-1 h-4 w-4" /> Back
+        </Link>
+      </Button>
       <Card className="w-full max-w-md shadow-[var(--shadow-elevated)]">
         <CardHeader className="text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
