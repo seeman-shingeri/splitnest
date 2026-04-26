@@ -86,11 +86,9 @@ export default function ExpensesPage() {
           <h1 className="text-2xl font-bold tracking-tight">Expenses</h1>
           <p className="text-sm text-muted-foreground">Track and split shared costs</p>
         </div>
-        {isOwner && (
-          <Button size="sm" onClick={() => { setEditing(null); setOpen(true); }} disabled={!roommates?.length}>
-            <Plus className="mr-1 h-4 w-4" /> Add
-          </Button>
-        )}
+        <Button size="sm" onClick={() => { setEditing(null); setOpen(true); }} disabled={!roommates?.length}>
+          <Plus className="mr-1 h-4 w-4" /> Add
+        </Button>
       </div>
 
       {!roommates?.length && (
