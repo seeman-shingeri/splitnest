@@ -1,10 +1,10 @@
-import { Outlet, NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Users, Receipt, UtensilsCrossed, BarChart3, Bell, Home } from "lucide-react";
+import { Outlet, NavLink, useLocation, useNavigate, Link } from "react-router-dom";
+import { LayoutDashboard, Users, Receipt, UtensilsCrossed, BarChart3, Home, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGroup } from "@/hooks/useGroup";
 import { NotificationBell } from "./NotificationBell";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
-import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 const tabs = [
   { to: "/", icon: LayoutDashboard, label: "Home" },
@@ -19,6 +19,16 @@ export function AppLayout() {
   const { data: group } = useGroup();
   useRealtimeSync(group?.id, user?.id);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // Tab roots — these are the bottom-tab destinations and should NOT show a back button.
+  const tabRoots = new Set(["/", "/expenses", "/meals", "/reports", "/roommates"]);
+  const isRoot = tabRoots.has(location.pathname);
+
+  const handleBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/");
+  };
 
   const titleMap: Record<string, string> = {
     "/": "Dashboard",
@@ -36,12 +46,29 @@ export function AppLayout() {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <header
-        className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/85 px-4 backdrop-blur"
+        className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-3 backdrop-blur"
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
-        <Link to="/profile" className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-          <Home className="h-4 w-4" />
-        </Link>
+        {isRoot ? (
+          <Link
+            to="/profile"
+            aria-label="Profile"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm"
+          >
+            <Home className="h-4 w-4" />
+          </Link>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Go back"
+            onClick={handleBack}
+            className="h-9 w-9 rounded-xl"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        )}
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold leading-tight">{headerTitle}</div>
           <div className="truncate text-[11px] text-muted-foreground">{group?.name ?? "—"}</div>

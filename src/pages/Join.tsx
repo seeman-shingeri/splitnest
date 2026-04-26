@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Ticket } from "lucide-react";
+import { Loader2, Ticket, ArrowLeft } from "lucide-react";
 import { notifyGroup } from "@/lib/notify";
 import { clearPendingReferralCode, getPendingReferralCode, setPendingReferralCode } from "@/lib/join-flow";
 
@@ -87,11 +87,26 @@ export default function JoinPage() {
     await redeem(trimmed);
   };
 
+  const handleBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate(user ? "/" : "/auth");
+  };
+
   return (
     <div
-      className="flex min-h-screen items-center justify-center p-4"
+      className="relative flex min-h-screen items-center justify-center p-4"
       style={{ background: "var(--gradient-subtle)" }}
     >
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={handleBack}
+        className="absolute left-3 top-3"
+        aria-label="Go back"
+      >
+        <ArrowLeft className="mr-1 h-4 w-4" /> Back
+      </Button>
       <Card className="w-full max-w-md shadow-[var(--shadow-elevated)]">
         <CardHeader className="text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">

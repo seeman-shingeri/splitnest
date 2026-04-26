@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Home, Loader2 } from "lucide-react";
+import { Home, Loader2, ArrowLeft } from "lucide-react";
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
@@ -51,9 +51,19 @@ export default function ResetPasswordPage() {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center p-4"
+      className="relative flex min-h-screen items-center justify-center p-4"
       style={{ background: "var(--gradient-subtle)" }}
     >
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => navigate("/auth")}
+        className="absolute left-3 top-3"
+        aria-label="Back to sign in"
+      >
+        <ArrowLeft className="mr-1 h-4 w-4" /> Back
+      </Button>
       <Card className="w-full max-w-md shadow-[var(--shadow-elevated)]">
         <CardHeader className="text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
