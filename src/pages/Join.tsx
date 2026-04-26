@@ -24,6 +24,15 @@ export default function JoinPage() {
     if (pending) setCode(pending);
   }, []);
 
+  const getJoinErrorMessage = (message?: string) => {
+    const normalized = message?.toLowerCase() ?? "";
+    if (normalized.includes("invalid referral code")) return "That referral code is invalid. Please check it and try again.";
+    if (normalized.includes("already been used")) return "That referral code has already been used. Ask the group owner for a new one.";
+    if (normalized.includes("already own this group")) return "You're already the owner of this group.";
+    if (normalized.includes("not authenticated")) return "Please sign in to join this group.";
+    return "Unable to join group right now. Please try again.";
+  };
+
   const redeem = async (rawCode: string) => {
     const trimmed = rawCode.trim().toUpperCase();
     if (!trimmed) {
@@ -54,7 +63,7 @@ export default function JoinPage() {
       toast.success("You've joined the group!");
       navigate("/complete-profile", { replace: true });
     } catch (err: any) {
-      toast.error(err.message ?? "Failed to join");
+      toast.error(getJoinErrorMessage(err?.message));
     } finally {
       setBusy(false);
     }
