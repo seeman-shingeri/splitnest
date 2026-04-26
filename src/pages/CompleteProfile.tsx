@@ -21,6 +21,14 @@ export default function CompleteProfilePage() {
   const [paymentInfo, setPaymentInfo] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const getSaveErrorMessage = (message?: string) => {
+    const normalized = message?.toLowerCase() ?? "";
+    if (normalized.includes("full name is required")) return "Please enter your full name to continue.";
+    if (normalized.includes("not a member of this group")) return "We couldn't confirm your group access. Please try joining again.";
+    if (normalized.includes("not authenticated")) return "Please sign in again to continue.";
+    return "Unable to save your details right now. Please try again.";
+  };
+
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["member-profile", user?.id, group?.id],
     enabled: !!user && !!group?.id,
@@ -66,7 +74,7 @@ export default function CompleteProfilePage() {
     });
     setSaving(false);
 
-    if (error) return toast.error(error.message ?? "Could not save profile");
+    if (error) return toast.error(getSaveErrorMessage(error.message));
 
     await Promise.all([
       qc.invalidateQueries({ queryKey: ["member-profile"] }),
