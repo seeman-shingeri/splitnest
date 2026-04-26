@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Home, Loader2 } from "lucide-react";
+import { Home, Loader2, ArrowLeft } from "lucide-react";
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate();
