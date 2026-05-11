@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { formatCurrency } from "@/lib/currency";
 import { notifyGroup } from "@/lib/notify";
-import { pointsFor, formatPoints, splitByPoints, DEFAULT_WEIGHTS, type MealWeights } from "@/lib/meals";
+import { pointsFor, formatPoints, splitByPoints, type MealWeights } from "@/lib/meals";
 
 const CATEGORIES = ["Rent", "Electricity", "Water", "Internet", "Groceries", "Maintenance", "Other"];
 
