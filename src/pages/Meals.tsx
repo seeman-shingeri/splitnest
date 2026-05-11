@@ -10,13 +10,36 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, UtensilsCrossed, Settings2, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
+import { Loader2, UtensilsCrossed, Settings2, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { addDays, format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { formatCurrency, CURRENCY } from "@/lib/currency";
+import { pointsFor, formatPoints, splitByPoints, DEFAULT_WEIGHTS, type MealWeights } from "@/lib/meals";
 
 interface Roommate { id: string; full_name: string }
 interface Entry { id?: string; roommate_id: string; entry_date: string; breakfast: number; lunch: number; dinner: number; }
+
+function useMealSettings(groupId: string | undefined) {
+  return useQuery({
+    queryKey: ["meal-settings", groupId],
+    enabled: !!groupId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("meal_settings")
+        .select("meal_charge, breakfast_weight, lunch_weight, dinner_weight")
+        .eq("group_id", groupId!)
+        .maybeSingle();
+      return {
+        charge: Number(data?.meal_charge ?? 0),
+        weights: {
+          breakfast: Number(data?.breakfast_weight ?? 1),
+          lunch: Number(data?.lunch_weight ?? 1),
+          dinner: Number(data?.dinner_weight ?? 1),
+        } as MealWeights,
+      };
+    },
+  });
+}
 
 export default function MealsPage() {
   const { data: group } = useGroup();
@@ -28,12 +51,12 @@ export default function MealsPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Meals</h1>
-          <p className="text-sm text-muted-foreground">Track daily meals and monthly bills</p>
+          <p className="text-sm text-muted-foreground">Track meal points and split groceries fairly</p>
         </div>
         {isOwner && <MealSettingsButton groupId={group!.id} />}
       </div>
 
-      <MealChargeBanner groupId={group?.id} />
+      <SettingsBanner groupId={group?.id} />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList className="grid w-full grid-cols-3">
@@ -55,23 +78,9 @@ export default function MealsPage() {
   );
 }
 
-function useMealCharge(groupId: string | undefined) {
-  return useQuery({
-    queryKey: ["meal-charge", groupId],
-    enabled: !!groupId,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("meal_settings")
-        .select("meal_charge")
-        .eq("group_id", groupId!)
-        .maybeSingle();
-      return Number(data?.meal_charge ?? 0);
-    },
-  });
-}
-
-function MealChargeBanner({ groupId }: { groupId?: string }) {
-  const { data: charge } = useMealCharge(groupId);
+function SettingsBanner({ groupId }: { groupId?: string }) {
+  const { data } = useMealSettings(groupId);
+  const w = data?.weights ?? DEFAULT_WEIGHTS;
   return (
     <Card className="border-primary/20 bg-accent/40">
       <CardContent className="flex items-center justify-between gap-3 p-4">
@@ -80,9 +89,15 @@ function MealChargeBanner({ groupId }: { groupId?: string }) {
             <UtensilsCrossed className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Meal charge</div>
-            <div className="text-lg font-semibold">{formatCurrency(charge ?? 0)} <span className="text-xs font-normal text-muted-foreground">/ meal</span></div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Meal weights</div>
+            <div className="text-sm font-semibold tabular-nums">
+              B {formatPoints(w.breakfast)} · L {formatPoints(w.lunch)} · D {formatPoints(w.dinner)}
+            </div>
           </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Charge / pt</div>
+          <div className="text-sm font-semibold">{formatCurrency(data?.charge ?? 0)}</div>
         </div>
       </CardContent>
     </Card>
@@ -91,28 +106,46 @@ function MealChargeBanner({ groupId }: { groupId?: string }) {
 
 function MealSettingsButton({ groupId }: { groupId: string }) {
   const qc = useQueryClient();
-  const { data: charge } = useMealCharge(groupId);
+  const { data } = useMealSettings(groupId);
   const [open, setOpen] = useState(false);
-  const [val, setVal] = useState("");
+  const [charge, setCharge] = useState("");
+  const [bw, setBw] = useState("1");
+  const [lw, setLw] = useState("1");
+  const [dw, setDw] = useState("1");
+
+  const openDialog = () => {
+    setCharge(String(data?.charge ?? 0));
+    setBw(String(data?.weights.breakfast ?? 1));
+    setLw(String(data?.weights.lunch ?? 1));
+    setDw(String(data?.weights.dinner ?? 1));
+    setOpen(true);
+  };
 
   const save = useMutation({
     mutationFn: async () => {
-      const n = parseFloat(val);
-      if (isNaN(n) || n < 0) throw new Error("Enter a valid charge");
+      const c = parseFloat(charge);
+      const b = parseFloat(bw);
+      const l = parseFloat(lw);
+      const d = parseFloat(dw);
+      if ([c, b, l, d].some((n) => !Number.isFinite(n) || n < 0)) {
+        throw new Error("All values must be 0 or greater");
+      }
+      const payload = { meal_charge: c, breakfast_weight: b, lunch_weight: l, dinner_weight: d };
       const { data: existing } = await supabase
         .from("meal_settings").select("id").eq("group_id", groupId).maybeSingle();
       if (existing) {
-        const { error } = await supabase.from("meal_settings").update({ meal_charge: n }).eq("id", existing.id);
+        const { error } = await supabase.from("meal_settings").update(payload).eq("id", existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("meal_settings").insert({ group_id: groupId, meal_charge: n });
+        const { error } = await supabase.from("meal_settings").insert({ group_id: groupId, ...payload });
         if (error) throw error;
       }
     },
     onSuccess: () => {
-      toast.success("Meal charge updated");
-      qc.invalidateQueries({ queryKey: ["meal-charge"] });
+      toast.success("Meal settings updated");
+      qc.invalidateQueries({ queryKey: ["meal-settings"] });
       qc.invalidateQueries({ queryKey: ["meal-summary"] });
+      qc.invalidateQueries({ queryKey: ["meal-points-for-split"] });
       qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
       setOpen(false);
     },
@@ -121,16 +154,36 @@ function MealSettingsButton({ groupId }: { groupId: string }) {
 
   return (
     <>
-      <Button size="sm" variant="outline" onClick={() => { setVal(String(charge ?? 0)); setOpen(true); }}>
+      <Button size="sm" variant="outline" onClick={openDialog}>
         <Settings2 className="mr-1.5 h-4 w-4" /> Settings
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Meal charge</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Label>Charge per meal ({CURRENCY})</Label>
-            <Input type="number" step="0.01" min="0" value={val} onChange={(e) => setVal(e.target.value)} />
-            <p className="text-xs text-muted-foreground">Each meal counted (breakfast, lunch, dinner) is charged at this rate.</p>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Meal settings</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Charge per point ({CURRENCY})</Label>
+              <Input type="number" inputMode="decimal" step="0.01" min="0" value={charge} onChange={(e) => setCharge(e.target.value)} />
+              <p className="text-[11px] text-muted-foreground">Used by the monthly meal-revenue summary.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Points per meal</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <div className="mb-1 text-[11px] uppercase text-muted-foreground">Breakfast</div>
+                  <Input type="number" inputMode="decimal" step="0.1" min="0" value={bw} onChange={(e) => setBw(e.target.value)} />
+                </div>
+                <div>
+                  <div className="mb-1 text-[11px] uppercase text-muted-foreground">Lunch</div>
+                  <Input type="number" inputMode="decimal" step="0.1" min="0" value={lw} onChange={(e) => setLw(e.target.value)} />
+                </div>
+                <div>
+                  <div className="mb-1 text-[11px] uppercase text-muted-foreground">Dinner</div>
+                  <Input type="number" inputMode="decimal" step="0.1" min="0" value={dw} onChange={(e) => setDw(e.target.value)} />
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Decimals allowed (e.g. 0.5, 1, 1.5).</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
@@ -147,6 +200,8 @@ function MealSettingsButton({ groupId }: { groupId: string }) {
 function MealEntry({ groupId }: { groupId?: string }) {
   const qc = useQueryClient();
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const { data: settings } = useMealSettings(groupId);
+  const weights = settings?.weights ?? DEFAULT_WEIGHTS;
 
   const { data: roommates } = useQuery({
     queryKey: ["roommates", groupId],
@@ -199,11 +254,28 @@ function MealEntry({ groupId }: { groupId?: string }) {
         if (error) throw error;
       }
     },
-    onSuccess: () => {
+    onMutate: async (e) => {
+      await qc.cancelQueries({ queryKey: ["meal-entries", groupId, date] });
+      const prev = qc.getQueryData<Entry[]>(["meal-entries", groupId, date]) || [];
+      const next = (() => {
+        const idx = prev.findIndex(p => p.roommate_id === e.roommate_id);
+        if (idx === -1) return [...prev, { ...e, entry_date: date }];
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], ...e, entry_date: date };
+        return copy;
+      })();
+      qc.setQueryData(["meal-entries", groupId, date], next);
+      return { prev };
+    },
+    onError: (err: Error, _e, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["meal-entries", groupId, date], ctx.prev);
+      toast.error(err.message);
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["meal-entries"] });
       qc.invalidateQueries({ queryKey: ["meal-summary"] });
+      qc.invalidateQueries({ queryKey: ["meal-points-for-split"] });
     },
-    onError: (e: Error) => toast.error(e.message),
   });
 
   const shiftDay = (d: number) => setDate(format(addDays(parseISO(date), d), "yyyy-MM-dd"));
@@ -233,21 +305,22 @@ function MealEntry({ groupId }: { groupId?: string }) {
         <div className="space-y-3">
           {roommates.map(r => {
             const e = map.get(r.id) ?? { roommate_id: r.id, entry_date: date, breakfast: 0, lunch: 0, dinner: 0 };
-            const total = (e.breakfast || 0) + (e.lunch || 0) + (e.dinner || 0);
+            const total = pointsFor(e, weights);
             return (
-              <Card key={r.id}>
+              <Card key={r.id} className="overflow-hidden">
                 <CardContent className="space-y-3 p-4">
                   <div className="flex items-center justify-between">
-                    <div className="font-medium">{r.full_name}</div>
-                    <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold text-accent-foreground">
-                      {total} pt{total === 1 ? "" : "s"}
+                    <div className="font-semibold">{r.full_name}</div>
+                    <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary tabular-nums">
+                      {formatPoints(total)} pt{total === 1 ? "" : "s"}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(["breakfast", "lunch", "dinner"] as const).map(slot => (
-                      <MealCounter
+                  <div className="space-y-1.5">
+                    {(["breakfast", "lunch", "dinner"] as const).map((slot) => (
+                      <MealRow
                         key={slot}
                         label={slot[0].toUpperCase() + slot.slice(1)}
+                        weight={weights[slot]}
                         value={(e as any)[slot] || 0}
                         onChange={(v) => upsert.mutate({ ...e, [slot]: v })}
                       />
@@ -263,21 +336,51 @@ function MealEntry({ groupId }: { groupId?: string }) {
   );
 }
 
-function MealCounter({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+function MealRow({
+  label, value, weight, onChange,
+}: { label: string; value: number; weight: number; onChange: (v: number) => void }) {
   return (
-    <div className="rounded-xl border bg-card p-2">
-      <div className="text-center text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-1 flex items-center justify-between gap-1">
-        <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={() => onChange(Math.max(0, value - 1))}>
-          −
+    <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 px-3 py-2">
+      <div className="min-w-0">
+        <div className="text-sm font-medium">{label}</div>
+        <div className="text-[11px] text-muted-foreground tabular-nums">×{formatPoints(weight)} pt</div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          size="icon"
+          variant="outline"
+          className="h-9 w-9 rounded-full"
+          onClick={() => onChange(Math.max(0, value - 1))}
+          aria-label={`Decrease ${label}`}
+          disabled={value <= 0}
+        >
+          <Minus className="h-4 w-4" />
         </Button>
-        <span className="min-w-6 text-center text-lg font-bold tabular-nums">{value}</span>
-        <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={() => onChange(value + 1)}>
-          +
+        <span className="min-w-7 text-center text-base font-bold tabular-nums">{value}</span>
+        <Button
+          type="button"
+          size="icon"
+          variant="outline"
+          className="h-9 w-9 rounded-full"
+          onClick={() => onChange(value + 1)}
+          aria-label={`Increase ${label}`}
+        >
+          <Plus className="h-4 w-4" />
         </Button>
       </div>
     </div>
   );
+}
+
+interface SummaryRow {
+  id: string;
+  name: string;
+  breakfast: number;
+  lunch: number;
+  dinner: number;
+  points: number;
+  groceryPayable: number;
 }
 
 function useMealSummary(groupId: string | undefined, monthStart: string, monthEnd: string) {
@@ -285,32 +388,62 @@ function useMealSummary(groupId: string | undefined, monthStart: string, monthEn
     queryKey: ["meal-summary", groupId, monthStart, monthEnd],
     enabled: !!groupId,
     queryFn: async () => {
-      const [rmRes, entriesRes, settingsRes] = await Promise.all([
+      const [rmRes, entriesRes, settingsRes, groceryRes] = await Promise.all([
         supabase.from("roommates").select("id, full_name").eq("group_id", groupId!),
         supabase.from("meal_entries")
           .select("roommate_id, entry_date, breakfast, lunch, dinner")
           .eq("group_id", groupId!)
           .gte("entry_date", monthStart).lte("entry_date", monthEnd),
-        supabase.from("meal_settings").select("meal_charge").eq("group_id", groupId!).maybeSingle(),
+        supabase.from("meal_settings")
+          .select("meal_charge, breakfast_weight, lunch_weight, dinner_weight")
+          .eq("group_id", groupId!)
+          .maybeSingle(),
+        supabase.from("expenses")
+          .select("amount")
+          .eq("group_id", groupId!)
+          .eq("category", "Groceries")
+          .gte("expense_date", monthStart).lte("expense_date", monthEnd),
       ]);
+
       const charge = Number(settingsRes.data?.meal_charge ?? 0);
+      const weights: MealWeights = {
+        breakfast: Number(settingsRes.data?.breakfast_weight ?? 1),
+        lunch: Number(settingsRes.data?.lunch_weight ?? 1),
+        dinner: Number(settingsRes.data?.dinner_weight ?? 1),
+      };
       const roommates: Roommate[] = rmRes.data || [];
-      const totals = new Map<string, number>();
-      roommates.forEach(r => totals.set(r.id, 0));
+
+      const counts = new Map<string, MealCounts>();
+      roommates.forEach(r => counts.set(r.id, { breakfast: 0, lunch: 0, dinner: 0 }));
       (entriesRes.data || []).forEach((e: any) => {
-        const t = (e.breakfast || 0) + (e.lunch || 0) + (e.dinner || 0);
-        totals.set(e.roommate_id, (totals.get(e.roommate_id) || 0) + t);
+        const c = counts.get(e.roommate_id) || { breakfast: 0, lunch: 0, dinner: 0 };
+        c.breakfast += e.breakfast || 0;
+        c.lunch += e.lunch || 0;
+        c.dinner += e.dinner || 0;
+        counts.set(e.roommate_id, c);
       });
-      const rows = roommates.map(r => {
-        const points = totals.get(r.id) || 0;
-        return { id: r.id, name: r.full_name, points, payable: points * charge };
+
+      const groceryTotal = (groceryRes.data || []).reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
+
+      const interim = roommates.map(r => {
+        const c = counts.get(r.id) || { breakfast: 0, lunch: 0, dinner: 0 };
+        return { id: r.id, name: r.full_name, ...c, points: pointsFor(c, weights) };
       });
+
+      const groceryShares = splitByPoints(groceryTotal, interim.map(r => r.points));
+
+      const rows: SummaryRow[] = interim.map((r, i) => ({
+        ...r,
+        groceryPayable: groceryShares[i] ?? 0,
+      }));
+
       const totalPoints = rows.reduce((s, r) => s + r.points, 0);
-      const totalRevenue = totalPoints * charge;
-      return { rows, charge, totalPoints, totalRevenue };
+      return { rows, charge, weights, totalPoints, totalRevenue: totalPoints * charge, groceryTotal };
     },
   });
 }
+
+type MealCounts = { breakfast: number; lunch: number; dinner: number };
 
 function MealSummary({ groupId }: { groupId?: string }) {
   const monthStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
@@ -326,13 +459,13 @@ function MealSummary({ groupId }: { groupId?: string }) {
         <Card>
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Total points</div>
-            <div className="mt-1 text-2xl font-bold tabular-nums">{data.totalPoints}</div>
+            <div className="mt-1 text-2xl font-bold tabular-nums">{formatPoints(data.totalPoints)}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Meal revenue</div>
-            <div className="mt-1 text-2xl font-bold tabular-nums">{formatCurrency(data.totalRevenue)}</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Groceries</div>
+            <div className="mt-1 text-2xl font-bold tabular-nums">{formatCurrency(data.groceryTotal)}</div>
           </CardContent>
         </Card>
       </div>
@@ -345,12 +478,19 @@ function MealSummary({ groupId }: { groupId?: string }) {
           ) : (
             <ul className="divide-y">
               {data.rows.map(r => (
-                <li key={r.id} className="flex items-center justify-between gap-3 p-4">
-                  <div>
-                    <div className="font-medium">{r.name}</div>
-                    <div className="text-xs text-muted-foreground">{r.points} point{r.points === 1 ? "" : "s"}</div>
+                <li key={r.id} className="space-y-1 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{r.name}</div>
+                      <div className="text-[11px] text-muted-foreground tabular-nums">
+                        B {r.breakfast} · L {r.lunch} · D {r.dinner} · {formatPoints(r.points)} pts
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[11px] uppercase text-muted-foreground">Grocery share</div>
+                      <div className="font-semibold tabular-nums">{formatCurrency(r.groceryPayable)}</div>
+                    </div>
                   </div>
-                  <div className="text-right font-semibold">{formatCurrency(r.payable)}</div>
                 </li>
               ))}
             </ul>
@@ -382,12 +522,12 @@ function MonthlyMealReport({ groupId }: { groupId?: string }) {
         <>
           <div className="grid grid-cols-3 gap-3">
             <Card><CardContent className="p-3 text-center">
-              <div className="text-[11px] uppercase text-muted-foreground">Charge</div>
-              <div className="mt-0.5 text-base font-semibold">{formatCurrency(data.charge)}</div>
+              <div className="text-[11px] uppercase text-muted-foreground">Points</div>
+              <div className="mt-0.5 text-base font-semibold tabular-nums">{formatPoints(data.totalPoints)}</div>
             </CardContent></Card>
             <Card><CardContent className="p-3 text-center">
-              <div className="text-[11px] uppercase text-muted-foreground">Points</div>
-              <div className="mt-0.5 text-base font-semibold tabular-nums">{data.totalPoints}</div>
+              <div className="text-[11px] uppercase text-muted-foreground">Groceries</div>
+              <div className="mt-0.5 text-base font-semibold">{formatCurrency(data.groceryTotal)}</div>
             </CardContent></Card>
             <Card><CardContent className="p-3 text-center">
               <div className="text-[11px] uppercase text-muted-foreground">Revenue</div>
@@ -396,19 +536,22 @@ function MonthlyMealReport({ groupId }: { groupId?: string }) {
           </div>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">Payable per roommate</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Monthly breakdown</CardTitle></CardHeader>
             <CardContent className="p-0">
               {!data.rows.length ? (
                 <div className="p-6 text-center text-sm text-muted-foreground">No data.</div>
               ) : (
                 <ul className="divide-y">
                   {data.rows.map(r => (
-                    <li key={r.id} className="flex items-center justify-between p-4">
-                      <div>
+                    <li key={r.id} className="space-y-1 p-4">
+                      <div className="flex items-center justify-between gap-3">
                         <div className="font-medium">{r.name}</div>
-                        <div className="text-xs text-muted-foreground">{r.points} pts × {formatCurrency(data.charge)}</div>
+                        <div className="font-semibold tabular-nums">{formatCurrency(r.groceryPayable)}</div>
                       </div>
-                      <div className="font-semibold">{formatCurrency(r.payable)}</div>
+                      <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums">
+                        <span>B {r.breakfast} · L {r.lunch} · D {r.dinner}</span>
+                        <span>{formatPoints(r.points)} pts</span>
+                      </div>
                     </li>
                   ))}
                 </ul>

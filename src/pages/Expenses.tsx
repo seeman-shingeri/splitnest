@@ -11,12 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plus, Pencil, Trash2, Loader2, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { formatCurrency } from "@/lib/currency";
 import { notifyGroup } from "@/lib/notify";
+import { pointsFor, formatPoints, splitByPoints, type MealWeights } from "@/lib/meals";
 
 const CATEGORIES = ["Rent", "Electricity", "Water", "Internet", "Groceries", "Maintenance", "Other"];
 
@@ -234,16 +235,28 @@ function ExpenseDialog({
     queryKey: ["meal-points-for-split", groupId, monthKey.start, monthKey.end],
     enabled: !!groupId && open,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("meal_entries")
-        .select("roommate_id, breakfast, lunch, dinner")
-        .eq("group_id", groupId!)
-        .gte("entry_date", monthKey.start)
-        .lte("entry_date", monthKey.end);
-      if (error) throw error;
+      const [entriesRes, settingsRes] = await Promise.all([
+        supabase
+          .from("meal_entries")
+          .select("roommate_id, breakfast, lunch, dinner")
+          .eq("group_id", groupId!)
+          .gte("entry_date", monthKey.start)
+          .lte("entry_date", monthKey.end),
+        supabase
+          .from("meal_settings")
+          .select("breakfast_weight, lunch_weight, dinner_weight")
+          .eq("group_id", groupId!)
+          .maybeSingle(),
+      ]);
+      if (entriesRes.error) throw entriesRes.error;
+      const weights: MealWeights = {
+        breakfast: Number(settingsRes.data?.breakfast_weight ?? 1),
+        lunch: Number(settingsRes.data?.lunch_weight ?? 1),
+        dinner: Number(settingsRes.data?.dinner_weight ?? 1),
+      };
       const map = new Map<string, number>();
-      (data || []).forEach((e: any) => {
-        const t = (e.breakfast || 0) + (e.lunch || 0) + (e.dinner || 0);
+      (entriesRes.data || []).forEach((e: any) => {
+        const t = pointsFor(e, weights);
         map.set(e.roommate_id, (map.get(e.roommate_id) || 0) + t);
       });
       return map;
@@ -280,16 +293,8 @@ function ExpenseDialog({
         if (totalPts <= 0) {
           throw new Error("No meal points recorded for this month — log meals first or pick another split type.");
         }
-        const totalCents = Math.round(numericAmount * 100);
-        // Largest-remainder distribution to ensure cents sum exactly
-        const raw = points.map(p => (p / totalPts) * totalCents);
-        const floors = raw.map(v => Math.floor(v));
-        let remainder = totalCents - floors.reduce((s, n) => s + n, 0);
-        const order = raw
-          .map((v, i) => ({ i, frac: v - Math.floor(v) }))
-          .sort((a, b) => b.frac - a.frac);
-        for (let k = 0; k < remainder; k++) floors[order[k].i]++;
-        splits = ids.map((id, i) => ({ roommate_id: id, amount: floors[i] / 100 }));
+        const shares = splitByPoints(numericAmount, points);
+        splits = ids.map((id, i) => ({ roommate_id: id, amount: shares[i] }));
       } else {
         splits = ids.map(id => ({ roommate_id: id, amount: parseFloat(manual[id]) || 0 }));
         const total = splits.reduce((s, x) => s + x.amount, 0);
@@ -394,14 +399,29 @@ function ExpenseDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Split type</Label>
-            <Tabs value={splitType} onValueChange={(v) => setSplitType(v as any)}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="equal">Equal</TabsTrigger>
-                <TabsTrigger value="meal_points">Meal pts</TabsTrigger>
-                <TabsTrigger value="manual">Manual</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <Label>Split method</Label>
+            <RadioGroup
+              value={splitType}
+              onValueChange={(v) => setSplitType(v as any)}
+              className="grid grid-cols-3 gap-2"
+            >
+              {([
+                { v: "equal", label: "Equal" },
+                { v: "meal_points", label: "Meal based" },
+                { v: "manual", label: "Manual" },
+              ] as const).map((opt) => (
+                <label
+                  key={opt.v}
+                  htmlFor={`split-${opt.v}`}
+                  className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition ${
+                    splitType === opt.v ? "border-primary bg-primary/5 font-semibold" : "border-input"
+                  }`}
+                >
+                  <RadioGroupItem id={`split-${opt.v}`} value={opt.v} />
+                  <span className="truncate">{opt.label}</span>
+                </label>
+              ))}
+            </RadioGroup>
             {splitType === "meal_points" && (
               <p className="text-[11px] text-muted-foreground">
                 Splits proportionally to each roommate's meal points for {format(parseISO(monthKey.start), "MMM yyyy")}.
@@ -412,13 +432,9 @@ function ExpenseDialog({
           <div className="space-y-2 rounded-lg border p-3">
             <Label className="text-xs uppercase text-muted-foreground">Split among</Label>
             <div className="space-y-2">
-              {roommates.map(r => {
+              {roommates.map((r) => {
                 const checked = selected.has(r.id);
                 const pts = mealPoints?.get(r.id) || 0;
-                const totalPts = Array.from(selected).reduce((s, id) => s + (mealPoints?.get(id) || 0), 0);
-                const mpShare = splitType === "meal_points" && totalPts > 0 && checked
-                  ? (pts / totalPts) * numericAmount
-                  : 0;
                 return (
                   <div key={r.id} className="flex items-center gap-3">
                     <Checkbox checked={checked} onCheckedChange={() => toggleSelect(r.id)} />
@@ -432,13 +448,9 @@ function ExpenseDialog({
                         onChange={(e) => setManual({ ...manual, [r.id]: e.target.value })}
                       />
                     )}
-                    {splitType === "equal" && checked && selected.size > 0 && numericAmount > 0 && (
-                      <span className="text-xs text-muted-foreground">{formatCurrency(numericAmount / selected.size)}</span>
-                    )}
                     {splitType === "meal_points" && checked && (
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {pts} pt{pts === 1 ? "" : "s"}
-                        {numericAmount > 0 && totalPts > 0 && ` · ${formatCurrency(mpShare)}`}
+                      <span className="text-[11px] text-muted-foreground tabular-nums">
+                        {formatPoints(pts)} pt{pts === 1 ? "" : "s"}
                       </span>
                     )}
                   </div>
@@ -451,12 +463,18 @@ function ExpenseDialog({
                 <span>Expense: {formatCurrency(numericAmount)}</span>
               </div>
             )}
-            {splitType === "meal_points" && selected.size > 0 && (
-              <div className="mt-2 text-[11px] text-muted-foreground">
-                Total meal points among selected: {Array.from(selected).reduce((s, id) => s + (mealPoints?.get(id) || 0), 0)}
-              </div>
-            )}
           </div>
+
+          {numericAmount > 0 && selected.size > 0 && (
+            <SplitPreview
+              amount={numericAmount}
+              splitType={splitType}
+              selected={selected}
+              roommates={roommates}
+              mealPoints={mealPoints}
+              manual={manual}
+            />
+          )}
 
           <div className="space-y-2">
             <Label>Notes</Label>
@@ -472,5 +490,71 @@ function ExpenseDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SplitPreview({
+  amount, splitType, selected, roommates, mealPoints, manual,
+}: {
+  amount: number;
+  splitType: "equal" | "manual" | "meal_points";
+  selected: Set<string>;
+  roommates: Roommate[];
+  mealPoints?: Map<string, number>;
+  manual: Record<string, string>;
+}) {
+  const ids = roommates.filter((r) => selected.has(r.id)).map((r) => r.id);
+  if (!ids.length || !(amount > 0)) return null;
+
+  let shares: number[] = [];
+  let pts: number[] = [];
+
+  if (splitType === "equal") {
+    const totalCents = Math.round(amount * 100);
+    const baseCents = Math.floor(totalCents / ids.length);
+    const remainder = totalCents - baseCents * ids.length;
+    shares = ids.map((_, i) => (baseCents + (i < remainder ? 1 : 0)) / 100);
+  } else if (splitType === "meal_points") {
+    pts = ids.map((id) => mealPoints?.get(id) || 0);
+    shares = splitByPoints(amount, pts);
+  } else {
+    shares = ids.map((id) => parseFloat(manual[id]) || 0);
+  }
+
+  const totalPts = pts.reduce((s, n) => s + n, 0);
+  const sum = shares.reduce((s, n) => s + n, 0);
+  const noMealData = splitType === "meal_points" && totalPts <= 0;
+
+  return (
+    <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-wide text-primary">Live preview</div>
+        <div className="text-[11px] text-muted-foreground tabular-nums">Total {formatCurrency(amount)}</div>
+      </div>
+      {noMealData ? (
+        <p className="text-xs text-destructive">No meal points logged for this month — log meals or pick another split.</p>
+      ) : (
+        <ul className="space-y-1">
+          {ids.map((id, i) => {
+            const r = roommates.find((x) => x.id === id);
+            return (
+              <li key={id} className="flex items-center justify-between gap-3 text-sm">
+                <span className="truncate">{r?.full_name ?? "—"}</span>
+                <span className="text-right tabular-nums">
+                  {splitType === "meal_points" && (
+                    <span className="mr-2 text-[11px] text-muted-foreground">{formatPoints(pts[i])} pts</span>
+                  )}
+                  <span className="font-semibold">{formatCurrency(shares[i] || 0)}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="flex items-center justify-between border-t pt-2 text-[11px] text-muted-foreground tabular-nums">
+        <span>Sum of shares</span>
+        <span className={Math.abs(sum - amount) > 0.01 ? "text-destructive" : ""}>{formatCurrency(sum)}</span>
+      </div>
+    </div>
   );
 }
