@@ -500,3 +500,69 @@ function ExpenseDialog({
     </Dialog>
   );
 }
+
+function SplitPreview({
+  amount, splitType, selected, roommates, mealPoints, manual,
+}: {
+  amount: number;
+  splitType: "equal" | "manual" | "meal_points";
+  selected: Set<string>;
+  roommates: Roommate[];
+  mealPoints?: Map<string, number>;
+  manual: Record<string, string>;
+}) {
+  const ids = roommates.filter((r) => selected.has(r.id)).map((r) => r.id);
+  if (!ids.length || !(amount > 0)) return null;
+
+  let shares: number[] = [];
+  let pts: number[] = [];
+
+  if (splitType === "equal") {
+    const totalCents = Math.round(amount * 100);
+    const baseCents = Math.floor(totalCents / ids.length);
+    const remainder = totalCents - baseCents * ids.length;
+    shares = ids.map((_, i) => (baseCents + (i < remainder ? 1 : 0)) / 100);
+  } else if (splitType === "meal_points") {
+    pts = ids.map((id) => mealPoints?.get(id) || 0);
+    shares = splitByPoints(amount, pts);
+  } else {
+    shares = ids.map((id) => parseFloat(manual[id]) || 0);
+  }
+
+  const totalPts = pts.reduce((s, n) => s + n, 0);
+  const sum = shares.reduce((s, n) => s + n, 0);
+  const noMealData = splitType === "meal_points" && totalPts <= 0;
+
+  return (
+    <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-wide text-primary">Live preview</div>
+        <div className="text-[11px] text-muted-foreground tabular-nums">Total {formatCurrency(amount)}</div>
+      </div>
+      {noMealData ? (
+        <p className="text-xs text-destructive">No meal points logged for this month — log meals or pick another split.</p>
+      ) : (
+        <ul className="space-y-1">
+          {ids.map((id, i) => {
+            const r = roommates.find((x) => x.id === id);
+            return (
+              <li key={id} className="flex items-center justify-between gap-3 text-sm">
+                <span className="truncate">{r?.full_name ?? "—"}</span>
+                <span className="text-right tabular-nums">
+                  {splitType === "meal_points" && (
+                    <span className="mr-2 text-[11px] text-muted-foreground">{formatPoints(pts[i])} pts</span>
+                  )}
+                  <span className="font-semibold">{formatCurrency(shares[i] || 0)}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <div className="flex items-center justify-between border-t pt-2 text-[11px] text-muted-foreground tabular-nums">
+        <span>Sum of shares</span>
+        <span className={Math.abs(sum - amount) > 0.01 ? "text-destructive" : ""}>{formatCurrency(sum)}</span>
+      </div>
+    </div>
+  );
+}
