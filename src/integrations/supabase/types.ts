@@ -429,6 +429,15 @@ export type Database = {
         Args: { _group_id: string; _user_id: string }
         Returns: boolean
       }
+      notify_group_event: {
+        Args: {
+          _body?: string
+          _group_id: string
+          _title: string
+          _type: string
+        }
+        Returns: undefined
+      }
       redeem_referral_code: { Args: { _code: string }; Returns: string }
     }
     Enums: {
