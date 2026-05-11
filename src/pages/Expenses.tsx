@@ -11,12 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Plus, Pencil, Trash2, Loader2, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { formatCurrency } from "@/lib/currency";
 import { notifyGroup } from "@/lib/notify";
+import { pointsFor, formatPoints, splitByPoints, DEFAULT_WEIGHTS, type MealWeights } from "@/lib/meals";
 
 const CATEGORIES = ["Rent", "Electricity", "Water", "Internet", "Groceries", "Maintenance", "Other"];
 
