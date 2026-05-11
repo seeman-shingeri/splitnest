@@ -407,14 +407,29 @@ function ExpenseDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Split type</Label>
-            <Tabs value={splitType} onValueChange={(v) => setSplitType(v as any)}>
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="equal">Equal</TabsTrigger>
-                <TabsTrigger value="meal_points">Meal pts</TabsTrigger>
-                <TabsTrigger value="manual">Manual</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <Label>Split method</Label>
+            <RadioGroup
+              value={splitType}
+              onValueChange={(v) => setSplitType(v as any)}
+              className="grid grid-cols-3 gap-2"
+            >
+              {([
+                { v: "equal", label: "Equal" },
+                { v: "meal_points", label: "Meal based" },
+                { v: "manual", label: "Manual" },
+              ] as const).map((opt) => (
+                <label
+                  key={opt.v}
+                  htmlFor={`split-${opt.v}`}
+                  className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition ${
+                    splitType === opt.v ? "border-primary bg-primary/5 font-semibold" : "border-input"
+                  }`}
+                >
+                  <RadioGroupItem id={`split-${opt.v}`} value={opt.v} />
+                  <span className="truncate">{opt.label}</span>
+                </label>
+              ))}
+            </RadioGroup>
             {splitType === "meal_points" && (
               <p className="text-[11px] text-muted-foreground">
                 Splits proportionally to each roommate's meal points for {format(parseISO(monthKey.start), "MMM yyyy")}.
@@ -425,13 +440,9 @@ function ExpenseDialog({
           <div className="space-y-2 rounded-lg border p-3">
             <Label className="text-xs uppercase text-muted-foreground">Split among</Label>
             <div className="space-y-2">
-              {roommates.map(r => {
+              {roommates.map((r) => {
                 const checked = selected.has(r.id);
                 const pts = mealPoints?.get(r.id) || 0;
-                const totalPts = Array.from(selected).reduce((s, id) => s + (mealPoints?.get(id) || 0), 0);
-                const mpShare = splitType === "meal_points" && totalPts > 0 && checked
-                  ? (pts / totalPts) * numericAmount
-                  : 0;
                 return (
                   <div key={r.id} className="flex items-center gap-3">
                     <Checkbox checked={checked} onCheckedChange={() => toggleSelect(r.id)} />
@@ -445,13 +456,9 @@ function ExpenseDialog({
                         onChange={(e) => setManual({ ...manual, [r.id]: e.target.value })}
                       />
                     )}
-                    {splitType === "equal" && checked && selected.size > 0 && numericAmount > 0 && (
-                      <span className="text-xs text-muted-foreground">{formatCurrency(numericAmount / selected.size)}</span>
-                    )}
                     {splitType === "meal_points" && checked && (
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {pts} pt{pts === 1 ? "" : "s"}
-                        {numericAmount > 0 && totalPts > 0 && ` · ${formatCurrency(mpShare)}`}
+                      <span className="text-[11px] text-muted-foreground tabular-nums">
+                        {formatPoints(pts)} pt{pts === 1 ? "" : "s"}
                       </span>
                     )}
                   </div>
@@ -464,12 +471,18 @@ function ExpenseDialog({
                 <span>Expense: {formatCurrency(numericAmount)}</span>
               </div>
             )}
-            {splitType === "meal_points" && selected.size > 0 && (
-              <div className="mt-2 text-[11px] text-muted-foreground">
-                Total meal points among selected: {Array.from(selected).reduce((s, id) => s + (mealPoints?.get(id) || 0), 0)}
-              </div>
-            )}
           </div>
+
+          {numericAmount > 0 && selected.size > 0 && (
+            <SplitPreview
+              amount={numericAmount}
+              splitType={splitType}
+              selected={selected}
+              roommates={roommates}
+              mealPoints={mealPoints}
+              manual={manual}
+            />
+          )}
 
           <div className="space-y-2">
             <Label>Notes</Label>
