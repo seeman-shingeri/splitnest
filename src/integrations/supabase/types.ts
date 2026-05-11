@@ -198,23 +198,32 @@ export type Database = {
       }
       meal_settings: {
         Row: {
+          breakfast_weight: number
           created_at: string
+          dinner_weight: number
           group_id: string
           id: string
+          lunch_weight: number
           meal_charge: number
           updated_at: string
         }
         Insert: {
+          breakfast_weight?: number
           created_at?: string
+          dinner_weight?: number
           group_id: string
           id?: string
+          lunch_weight?: number
           meal_charge?: number
           updated_at?: string
         }
         Update: {
+          breakfast_weight?: number
           created_at?: string
+          dinner_weight?: number
           group_id?: string
           id?: string
+          lunch_weight?: number
           meal_charge?: number
           updated_at?: string
         }
