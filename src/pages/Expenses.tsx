@@ -235,16 +235,28 @@ function ExpenseDialog({
     queryKey: ["meal-points-for-split", groupId, monthKey.start, monthKey.end],
     enabled: !!groupId && open,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("meal_entries")
-        .select("roommate_id, breakfast, lunch, dinner")
-        .eq("group_id", groupId!)
-        .gte("entry_date", monthKey.start)
-        .lte("entry_date", monthKey.end);
-      if (error) throw error;
+      const [entriesRes, settingsRes] = await Promise.all([
+        supabase
+          .from("meal_entries")
+          .select("roommate_id, breakfast, lunch, dinner")
+          .eq("group_id", groupId!)
+          .gte("entry_date", monthKey.start)
+          .lte("entry_date", monthKey.end),
+        supabase
+          .from("meal_settings")
+          .select("breakfast_weight, lunch_weight, dinner_weight")
+          .eq("group_id", groupId!)
+          .maybeSingle(),
+      ]);
+      if (entriesRes.error) throw entriesRes.error;
+      const weights: MealWeights = {
+        breakfast: Number(settingsRes.data?.breakfast_weight ?? 1),
+        lunch: Number(settingsRes.data?.lunch_weight ?? 1),
+        dinner: Number(settingsRes.data?.dinner_weight ?? 1),
+      };
       const map = new Map<string, number>();
-      (data || []).forEach((e: any) => {
-        const t = (e.breakfast || 0) + (e.lunch || 0) + (e.dinner || 0);
+      (entriesRes.data || []).forEach((e: any) => {
+        const t = pointsFor(e, weights);
         map.set(e.roommate_id, (map.get(e.roommate_id) || 0) + t);
       });
       return map;
