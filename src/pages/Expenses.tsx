@@ -532,7 +532,7 @@ function SplitPreview({
         <div className="text-[11px] text-muted-foreground tabular-nums">Total {formatCurrency(amount)}</div>
       </div>
       {noMealData ? (
-        <p className="text-xs text-destructive">No meal points logged for this month — log meals or pick another split.</p>
+        <p className="text-xs text-destructive">No meals logged for this month — log meals or pick another split.</p>
       ) : (
         <ul className="space-y-1">
           {ids.map((id, i) => {
@@ -542,7 +542,7 @@ function SplitPreview({
                 <span className="truncate">{r?.full_name ?? "—"}</span>
                 <span className="text-right tabular-nums">
                   {splitType === "meal_points" && (
-                    <span className="mr-2 text-[11px] text-muted-foreground">{formatPoints(pts[i])} pts</span>
+                    <span className="mr-2 text-[11px] text-muted-foreground">{formatPoints(pts[i])} meals</span>
                   )}
                   <span className="font-semibold">{formatCurrency(shares[i] || 0)}</span>
                 </span>
