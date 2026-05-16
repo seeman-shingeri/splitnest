@@ -399,7 +399,7 @@ function ExpenseDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Split method</Label>
+            <Label>How to split the bill</Label>
             <RadioGroup
               value={splitType}
               onValueChange={(v) => setSplitType(v as any)}
@@ -407,8 +407,8 @@ function ExpenseDialog({
             >
               {([
                 { v: "equal", label: "Equal" },
-                { v: "meal_points", label: "Meal based" },
-                { v: "manual", label: "Manual" },
+                { v: "meal_points", label: "By meals" },
+                { v: "manual", label: "Custom" },
               ] as const).map((opt) => (
                 <label
                   key={opt.v}
@@ -424,7 +424,7 @@ function ExpenseDialog({
             </RadioGroup>
             {splitType === "meal_points" && (
               <p className="text-[11px] text-muted-foreground">
-                Splits proportionally to each roommate's meal points for {format(parseISO(monthKey.start), "MMM yyyy")}.
+                Food bill will be divided based on meals eaten in {format(parseISO(monthKey.start), "MMM yyyy")}.
               </p>
             )}
           </div>
