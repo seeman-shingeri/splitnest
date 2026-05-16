@@ -450,7 +450,7 @@ function ExpenseDialog({
                     )}
                     {splitType === "meal_points" && checked && (
                       <span className="text-[11px] text-muted-foreground tabular-nums">
-                        {formatPoints(pts)} pt{pts === 1 ? "" : "s"}
+                        {formatPoints(pts)} meal{pts === 1 ? "" : "s"}
                       </span>
                     )}
                   </div>
