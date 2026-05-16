@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { Loader2, UtensilsCrossed, Settings2, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Minus, Plus } from "lucide-react";
+import { Loader2, UtensilsCrossed, Settings2, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Minus, Plus, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { addDays, format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { formatCurrency, CURRENCY } from "@/lib/currency";
@@ -18,6 +18,7 @@ import { pointsFor, formatPoints, splitByPoints, DEFAULT_WEIGHTS, type MealWeigh
 
 interface Roommate { id: string; full_name: string }
 interface Entry { id?: string; roommate_id: string; entry_date: string; breakfast: number; lunch: number; dinner: number; }
+type MealCounts = { breakfast: number; lunch: number; dinner: number };
 
 function useMealSettings(groupId: string | undefined) {
   return useQuery({
@@ -51,21 +52,34 @@ export default function MealsPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Meals</h1>
-          <p className="text-sm text-muted-foreground">Track meal points and split groceries fairly</p>
+          <p className="text-sm text-muted-foreground">
+            {isOwner
+              ? "Log daily meals so the food bill divides fairly."
+              : "View your meals and food bill share."}
+          </p>
         </div>
         {isOwner && <MealSettingsButton groupId={group!.id} />}
       </div>
+
+      {!isOwner && (
+        <Card className="border-muted bg-muted/30">
+          <CardContent className="flex items-center gap-3 p-3 text-xs text-muted-foreground">
+            <Lock className="h-4 w-4 shrink-0" />
+            <span>Only the room owner can change meal counts. You can view your share below.</span>
+          </CardContent>
+        </Card>
+      )}
 
       <SettingsBanner groupId={group?.id} />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="entry">Entry</TabsTrigger>
-          <TabsTrigger value="summary">Summary</TabsTrigger>
-          <TabsTrigger value="report">Report</TabsTrigger>
+          <TabsTrigger value="entry">{isOwner ? "Log meals" : "Today"}</TabsTrigger>
+          <TabsTrigger value="summary">This month</TabsTrigger>
+          <TabsTrigger value="report">By month</TabsTrigger>
         </TabsList>
         <TabsContent value="entry" className="mt-4">
-          <MealEntry groupId={group?.id} />
+          <MealEntry groupId={group?.id} isOwner={isOwner} />
         </TabsContent>
         <TabsContent value="summary" className="mt-4">
           <MealSummary groupId={group?.id} />
@@ -81,6 +95,7 @@ export default function MealsPage() {
 function SettingsBanner({ groupId }: { groupId?: string }) {
   const { data } = useMealSettings(groupId);
   const w = data?.weights ?? DEFAULT_WEIGHTS;
+  const allEqual = w.breakfast === w.lunch && w.lunch === w.dinner;
   return (
     <Card className="border-primary/20 bg-accent/40">
       <CardContent className="flex items-center justify-between gap-3 p-4">
@@ -89,16 +104,20 @@ function SettingsBanner({ groupId }: { groupId?: string }) {
             <UtensilsCrossed className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Meal weights</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">How meals count</div>
             <div className="text-sm font-semibold tabular-nums">
-              B {formatPoints(w.breakfast)} · L {formatPoints(w.lunch)} · D {formatPoints(w.dinner)}
+              {allEqual
+                ? "Each meal = 1"
+                : `Breakfast ${formatPoints(w.breakfast)} · Lunch ${formatPoints(w.lunch)} · Dinner ${formatPoints(w.dinner)}`}
             </div>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Charge / pt</div>
-          <div className="text-sm font-semibold">{formatCurrency(data?.charge ?? 0)}</div>
-        </div>
+        {data?.charge ? (
+          <div className="text-right">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Per meal</div>
+            <div className="text-sm font-semibold">{formatCurrency(data.charge)}</div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -128,7 +147,7 @@ function MealSettingsButton({ groupId }: { groupId: string }) {
       const l = parseFloat(lw);
       const d = parseFloat(dw);
       if ([c, b, l, d].some((n) => !Number.isFinite(n) || n < 0)) {
-        throw new Error("All values must be 0 or greater");
+        throw new Error("Please enter values of 0 or more.");
       }
       const payload = { meal_charge: c, breakfast_weight: b, lunch_weight: l, dinner_weight: d };
       const { data: existing } = await supabase
@@ -142,14 +161,14 @@ function MealSettingsButton({ groupId }: { groupId: string }) {
       }
     },
     onSuccess: () => {
-      toast.success("Meal settings updated");
+      toast.success("Settings saved");
       qc.invalidateQueries({ queryKey: ["meal-settings"] });
       qc.invalidateQueries({ queryKey: ["meal-summary"] });
       qc.invalidateQueries({ queryKey: ["meal-points-for-split"] });
       qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
       setOpen(false);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: () => toast.error("Couldn't save settings. Please try again."),
   });
 
   return (
@@ -162,12 +181,12 @@ function MealSettingsButton({ groupId }: { groupId: string }) {
           <DialogHeader><DialogTitle>Meal settings</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Charge per point ({CURRENCY})</Label>
+              <Label>Price per meal ({CURRENCY})</Label>
               <Input type="number" inputMode="decimal" step="0.01" min="0" value={charge} onChange={(e) => setCharge(e.target.value)} />
-              <p className="text-[11px] text-muted-foreground">Used by the monthly meal-revenue summary.</p>
+              <p className="text-[11px] text-muted-foreground">Used only for the monthly meal income summary.</p>
             </div>
             <div className="space-y-2">
-              <Label>Points per meal</Label>
+              <Label>How much each meal counts</Label>
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <div className="mb-1 text-[11px] uppercase text-muted-foreground">Breakfast</div>
@@ -182,7 +201,7 @@ function MealSettingsButton({ groupId }: { groupId: string }) {
                   <Input type="number" inputMode="decimal" step="0.1" min="0" value={dw} onChange={(e) => setDw(e.target.value)} />
                 </div>
               </div>
-              <p className="text-[11px] text-muted-foreground">Decimals allowed (e.g. 0.5, 1, 1.5).</p>
+              <p className="text-[11px] text-muted-foreground">Leave all at 1 to count every meal equally.</p>
             </div>
           </div>
           <DialogFooter>
@@ -197,7 +216,7 @@ function MealSettingsButton({ groupId }: { groupId: string }) {
   );
 }
 
-function MealEntry({ groupId }: { groupId?: string }) {
+function MealEntry({ groupId, isOwner }: { groupId?: string; isOwner: boolean }) {
   const qc = useQueryClient();
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const { data: settings } = useMealSettings(groupId);
@@ -267,9 +286,9 @@ function MealEntry({ groupId }: { groupId?: string }) {
       qc.setQueryData(["meal-entries", groupId, date], next);
       return { prev };
     },
-    onError: (err: Error, _e, ctx) => {
+    onError: (_err: Error, _e, ctx) => {
       if (ctx?.prev) qc.setQueryData(["meal-entries", groupId, date], ctx.prev);
-      toast.error(err.message);
+      toast.error("Couldn't save. Only the room owner can change meals.");
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["meal-entries"] });
@@ -305,14 +324,14 @@ function MealEntry({ groupId }: { groupId?: string }) {
         <div className="space-y-3">
           {roommates.map(r => {
             const e = map.get(r.id) ?? { roommate_id: r.id, entry_date: date, breakfast: 0, lunch: 0, dinner: 0 };
-            const total = pointsFor(e, weights);
+            const totalMeals = (e.breakfast || 0) + (e.lunch || 0) + (e.dinner || 0);
             return (
               <Card key={r.id} className="overflow-hidden">
                 <CardContent className="space-y-3 p-4">
                   <div className="flex items-center justify-between">
                     <div className="font-semibold">{r.full_name}</div>
                     <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary tabular-nums">
-                      {formatPoints(total)} pt{total === 1 ? "" : "s"}
+                      {totalMeals} meal{totalMeals === 1 ? "" : "s"}
                     </span>
                   </div>
                   <div className="space-y-1.5">
@@ -322,6 +341,7 @@ function MealEntry({ groupId }: { groupId?: string }) {
                         label={slot[0].toUpperCase() + slot.slice(1)}
                         weight={weights[slot]}
                         value={(e as any)[slot] || 0}
+                        readOnly={!isOwner}
                         onChange={(v) => upsert.mutate({ ...e, [slot]: v })}
                       />
                     ))}
@@ -337,37 +357,44 @@ function MealEntry({ groupId }: { groupId?: string }) {
 }
 
 function MealRow({
-  label, value, weight, onChange,
-}: { label: string; value: number; weight: number; onChange: (v: number) => void }) {
+  label, value, weight, onChange, readOnly,
+}: { label: string; value: number; weight: number; onChange: (v: number) => void; readOnly: boolean }) {
+  const showWeight = Math.abs(weight - 1) > 1e-9;
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl bg-muted/40 px-3 py-2">
       <div className="min-w-0">
         <div className="text-sm font-medium">{label}</div>
-        <div className="text-[11px] text-muted-foreground tabular-nums">×{formatPoints(weight)} pt</div>
+        {showWeight && (
+          <div className="text-[11px] text-muted-foreground tabular-nums">counts as {formatPoints(weight)}</div>
+        )}
       </div>
       <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          className="h-9 w-9 rounded-full"
-          onClick={() => onChange(Math.max(0, value - 1))}
-          aria-label={`Decrease ${label}`}
-          disabled={value <= 0}
-        >
-          <Minus className="h-4 w-4" />
-        </Button>
+        {!readOnly && (
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            className="h-9 w-9 rounded-full"
+            onClick={() => onChange(Math.max(0, value - 1))}
+            aria-label={`Decrease ${label}`}
+            disabled={value <= 0}
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+        )}
         <span className="min-w-7 text-center text-base font-bold tabular-nums">{value}</span>
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          className="h-9 w-9 rounded-full"
-          onClick={() => onChange(value + 1)}
-          aria-label={`Increase ${label}`}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
+        {!readOnly && (
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            className="h-9 w-9 rounded-full"
+            onClick={() => onChange(value + 1)}
+            aria-label={`Increase ${label}`}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -379,6 +406,7 @@ interface SummaryRow {
   breakfast: number;
   lunch: number;
   dinner: number;
+  totalMeals: number;
   points: number;
   groceryPayable: number;
 }
@@ -427,7 +455,13 @@ function useMealSummary(groupId: string | undefined, monthStart: string, monthEn
 
       const interim = roommates.map(r => {
         const c = counts.get(r.id) || { breakfast: 0, lunch: 0, dinner: 0 };
-        return { id: r.id, name: r.full_name, ...c, points: pointsFor(c, weights) };
+        return {
+          id: r.id,
+          name: r.full_name,
+          ...c,
+          totalMeals: c.breakfast + c.lunch + c.dinner,
+          points: pointsFor(c, weights),
+        };
       });
 
       const groceryShares = splitByPoints(groceryTotal, interim.map(r => r.points));
@@ -437,13 +471,12 @@ function useMealSummary(groupId: string | undefined, monthStart: string, monthEn
         groceryPayable: groceryShares[i] ?? 0,
       }));
 
+      const totalMeals = rows.reduce((s, r) => s + r.totalMeals, 0);
       const totalPoints = rows.reduce((s, r) => s + r.points, 0);
-      return { rows, charge, weights, totalPoints, totalRevenue: totalPoints * charge, groceryTotal };
+      return { rows, charge, weights, totalMeals, totalPoints, totalRevenue: totalPoints * charge, groceryTotal };
     },
   });
 }
-
-type MealCounts = { breakfast: number; lunch: number; dinner: number };
 
 function MealSummary({ groupId }: { groupId?: string }) {
   const monthStart = format(startOfMonth(new Date()), "yyyy-MM-dd");
@@ -458,20 +491,23 @@ function MealSummary({ groupId }: { groupId?: string }) {
       <div className="grid grid-cols-2 gap-3">
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Total points</div>
-            <div className="mt-1 text-2xl font-bold tabular-nums">{formatPoints(data.totalPoints)}</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Total meals</div>
+            <div className="mt-1 text-2xl font-bold tabular-nums">{data.totalMeals}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Groceries</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Food bill</div>
             <div className="mt-1 text-2xl font-bold tabular-nums">{formatCurrency(data.groceryTotal)}</div>
           </CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">This month — by roommate</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Food bill share</CardTitle>
+          <p className="text-xs text-muted-foreground">Bill divided based on meals eaten this month.</p>
+        </CardHeader>
         <CardContent className="p-0">
           {!data.rows.length ? (
             <div className="p-6 text-center text-sm text-muted-foreground">No roommates yet.</div>
@@ -483,11 +519,11 @@ function MealSummary({ groupId }: { groupId?: string }) {
                     <div className="min-w-0">
                       <div className="truncate font-medium">{r.name}</div>
                       <div className="text-[11px] text-muted-foreground tabular-nums">
-                        B {r.breakfast} · L {r.lunch} · D {r.dinner} · {formatPoints(r.points)} pts
+                        {r.totalMeals} meal{r.totalMeals === 1 ? "" : "s"} · B {r.breakfast} · L {r.lunch} · D {r.dinner}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-[11px] uppercase text-muted-foreground">Grocery share</div>
+                      <div className="text-[11px] uppercase text-muted-foreground">Their share</div>
                       <div className="font-semibold tabular-nums">{formatCurrency(r.groceryPayable)}</div>
                     </div>
                   </div>
@@ -522,15 +558,15 @@ function MonthlyMealReport({ groupId }: { groupId?: string }) {
         <>
           <div className="grid grid-cols-3 gap-3">
             <Card><CardContent className="p-3 text-center">
-              <div className="text-[11px] uppercase text-muted-foreground">Points</div>
-              <div className="mt-0.5 text-base font-semibold tabular-nums">{formatPoints(data.totalPoints)}</div>
+              <div className="text-[11px] uppercase text-muted-foreground">Meals</div>
+              <div className="mt-0.5 text-base font-semibold tabular-nums">{data.totalMeals}</div>
             </CardContent></Card>
             <Card><CardContent className="p-3 text-center">
-              <div className="text-[11px] uppercase text-muted-foreground">Groceries</div>
+              <div className="text-[11px] uppercase text-muted-foreground">Food bill</div>
               <div className="mt-0.5 text-base font-semibold">{formatCurrency(data.groceryTotal)}</div>
             </CardContent></Card>
             <Card><CardContent className="p-3 text-center">
-              <div className="text-[11px] uppercase text-muted-foreground">Revenue</div>
+              <div className="text-[11px] uppercase text-muted-foreground">Meal income</div>
               <div className="mt-0.5 text-base font-semibold">{formatCurrency(data.totalRevenue)}</div>
             </CardContent></Card>
           </div>
@@ -550,7 +586,7 @@ function MonthlyMealReport({ groupId }: { groupId?: string }) {
                       </div>
                       <div className="flex items-center justify-between text-[11px] text-muted-foreground tabular-nums">
                         <span>B {r.breakfast} · L {r.lunch} · D {r.dinner}</span>
-                        <span>{formatPoints(r.points)} pts</span>
+                        <span>{r.totalMeals} meals</span>
                       </div>
                     </li>
                   ))}

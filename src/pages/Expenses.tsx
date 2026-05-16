@@ -291,7 +291,7 @@ function ExpenseDialog({
         const points = ids.map(id => mealPoints?.get(id) || 0);
         const totalPts = points.reduce((s, n) => s + n, 0);
         if (totalPts <= 0) {
-          throw new Error("No meal points recorded for this month — log meals first or pick another split type.");
+          throw new Error("No meals logged for this month — log meals first or pick another split.");
         }
         const shares = splitByPoints(numericAmount, points);
         splits = ids.map((id, i) => ({ roommate_id: id, amount: shares[i] }));
@@ -399,7 +399,7 @@ function ExpenseDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Split method</Label>
+            <Label>How to split the bill</Label>
             <RadioGroup
               value={splitType}
               onValueChange={(v) => setSplitType(v as any)}
@@ -407,8 +407,8 @@ function ExpenseDialog({
             >
               {([
                 { v: "equal", label: "Equal" },
-                { v: "meal_points", label: "Meal based" },
-                { v: "manual", label: "Manual" },
+                { v: "meal_points", label: "By meals" },
+                { v: "manual", label: "Custom" },
               ] as const).map((opt) => (
                 <label
                   key={opt.v}
@@ -424,7 +424,7 @@ function ExpenseDialog({
             </RadioGroup>
             {splitType === "meal_points" && (
               <p className="text-[11px] text-muted-foreground">
-                Splits proportionally to each roommate's meal points for {format(parseISO(monthKey.start), "MMM yyyy")}.
+                Food bill will be divided based on meals eaten in {format(parseISO(monthKey.start), "MMM yyyy")}.
               </p>
             )}
           </div>
@@ -450,7 +450,7 @@ function ExpenseDialog({
                     )}
                     {splitType === "meal_points" && checked && (
                       <span className="text-[11px] text-muted-foreground tabular-nums">
-                        {formatPoints(pts)} pt{pts === 1 ? "" : "s"}
+                        {formatPoints(pts)} meal{pts === 1 ? "" : "s"}
                       </span>
                     )}
                   </div>
@@ -532,7 +532,7 @@ function SplitPreview({
         <div className="text-[11px] text-muted-foreground tabular-nums">Total {formatCurrency(amount)}</div>
       </div>
       {noMealData ? (
-        <p className="text-xs text-destructive">No meal points logged for this month — log meals or pick another split.</p>
+        <p className="text-xs text-destructive">No meals logged for this month — log meals or pick another split.</p>
       ) : (
         <ul className="space-y-1">
           {ids.map((id, i) => {
@@ -542,7 +542,7 @@ function SplitPreview({
                 <span className="truncate">{r?.full_name ?? "—"}</span>
                 <span className="text-right tabular-nums">
                   {splitType === "meal_points" && (
-                    <span className="mr-2 text-[11px] text-muted-foreground">{formatPoints(pts[i])} pts</span>
+                    <span className="mr-2 text-[11px] text-muted-foreground">{formatPoints(pts[i])} meals</span>
                   )}
                   <span className="font-semibold">{formatCurrency(shares[i] || 0)}</span>
                 </span>
