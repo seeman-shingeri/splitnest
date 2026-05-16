@@ -291,7 +291,7 @@ function ExpenseDialog({
         const points = ids.map(id => mealPoints?.get(id) || 0);
         const totalPts = points.reduce((s, n) => s + n, 0);
         if (totalPts <= 0) {
-          throw new Error("No meal points recorded for this month — log meals first or pick another split type.");
+          throw new Error("No meals logged for this month — log meals first or pick another split.");
         }
         const shares = splitByPoints(numericAmount, points);
         splits = ids.map((id, i) => ({ roommate_id: id, amount: shares[i] }));
