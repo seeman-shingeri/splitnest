@@ -219,6 +219,8 @@ function MealSettingsButton({ groupId }: { groupId: string }) {
 
 function MealEntry({ groupId, isOwner }: { groupId?: string; isOwner: boolean }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? null;
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const { data: settings } = useMealSettings(groupId);
   const weights = settings?.weights ?? DEFAULT_WEIGHTS;
@@ -228,7 +230,7 @@ function MealEntry({ groupId, isOwner }: { groupId?: string; isOwner: boolean })
     enabled: !!groupId,
     queryFn: async (): Promise<Roommate[]> => {
       const { data, error } = await supabase
-        .from("roommates").select("id, full_name").eq("group_id", groupId!).order("created_at");
+        .from("roommates").select("id, full_name, user_id").eq("group_id", groupId!).order("created_at");
       if (error) throw error;
       return data || [];
     },
