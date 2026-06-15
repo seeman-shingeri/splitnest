@@ -449,7 +449,7 @@ function useMealSummary(groupId: string | undefined, monthStart: string, monthEn
         lunch: Number(settingsRes.data?.lunch_weight ?? 1),
         dinner: Number(settingsRes.data?.dinner_weight ?? 1),
       };
-      const roommates: Roommate[] = rmRes.data || [];
+      const roommates: Roommate[] = (rmRes.data || []).map((r: any) => ({ id: r.id, full_name: r.full_name, user_id: r.user_id ?? null }));
 
       const counts = new Map<string, MealCounts>();
       roommates.forEach(r => counts.set(r.id, { breakfast: 0, lunch: 0, dinner: 0 }));
