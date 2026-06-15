@@ -291,7 +291,7 @@ function MealEntry({ groupId, isOwner }: { groupId?: string; isOwner: boolean })
     },
     onError: (_err: Error, _e, ctx) => {
       if (ctx?.prev) qc.setQueryData(["meal-entries", groupId, date], ctx.prev);
-      toast.error("Couldn't save. Only the room owner can change meals.");
+      toast.error("Couldn't save. You can only change your own meals.");
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["meal-entries"] });
