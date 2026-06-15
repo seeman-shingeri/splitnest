@@ -328,11 +328,18 @@ function MealEntry({ groupId, isOwner }: { groupId?: string; isOwner: boolean })
           {roommates.map(r => {
             const e = map.get(r.id) ?? { roommate_id: r.id, entry_date: date, breakfast: 0, lunch: 0, dinner: 0 };
             const totalMeals = (e.breakfast || 0) + (e.lunch || 0) + (e.dinner || 0);
+            const isMine = !!currentUserId && r.user_id === currentUserId;
+            const canEdit = isOwner || isMine;
             return (
-              <Card key={r.id} className="overflow-hidden">
+              <Card key={r.id} className={`overflow-hidden ${isMine ? "border-primary/40" : ""}`}>
                 <CardContent className="space-y-3 p-4">
                   <div className="flex items-center justify-between">
-                    <div className="font-semibold">{r.full_name}</div>
+                    <div className="flex items-center gap-2 font-semibold">
+                      {r.full_name}
+                      {isMine && (
+                        <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">You</span>
+                      )}
+                    </div>
                     <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary tabular-nums">
                       {totalMeals} meal{totalMeals === 1 ? "" : "s"}
                     </span>
@@ -344,7 +351,7 @@ function MealEntry({ groupId, isOwner }: { groupId?: string; isOwner: boolean })
                         label={slot[0].toUpperCase() + slot.slice(1)}
                         weight={weights[slot]}
                         value={(e as any)[slot] || 0}
-                        readOnly={!isOwner}
+                        readOnly={!canEdit}
                         onChange={(v) => upsert.mutate({ ...e, [slot]: v })}
                       />
                     ))}
