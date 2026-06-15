@@ -66,7 +66,7 @@ export default function MealsPage() {
         <Card className="border-muted bg-muted/30">
           <CardContent className="flex items-center gap-3 p-3 text-xs text-muted-foreground">
             <Lock className="h-4 w-4 shrink-0" />
-            <span>Only the room owner can change meal counts. You can view your share below.</span>
+            <span>You can update your own meals. Only the room owner can change other members.</span>
           </CardContent>
         </Card>
       )}
