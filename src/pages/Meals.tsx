@@ -15,8 +15,9 @@ import { toast } from "sonner";
 import { addDays, format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { formatCurrency, CURRENCY } from "@/lib/currency";
 import { pointsFor, formatPoints, splitByPoints, DEFAULT_WEIGHTS, type MealWeights } from "@/lib/meals";
+import { useAuth } from "@/contexts/AuthContext";
 
-interface Roommate { id: string; full_name: string }
+interface Roommate { id: string; full_name: string; user_id: string | null }
 interface Entry { id?: string; roommate_id: string; entry_date: string; breakfast: number; lunch: number; dinner: number; }
 type MealCounts = { breakfast: number; lunch: number; dinner: number };
 
