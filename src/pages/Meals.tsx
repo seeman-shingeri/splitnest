@@ -56,7 +56,7 @@ export default function MealsPage() {
           <p className="text-sm text-muted-foreground">
             {isOwner
               ? "Log daily meals so the food bill divides fairly."
-              : "View your meals and food bill share."}
+              : "Log your own meals so your food bill share is accurate."}
           </p>
         </div>
         {isOwner && <MealSettingsButton groupId={group!.id} />}
