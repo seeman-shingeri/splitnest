@@ -15,8 +15,9 @@ import { toast } from "sonner";
 import { addDays, format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { formatCurrency, CURRENCY } from "@/lib/currency";
 import { pointsFor, formatPoints, splitByPoints, DEFAULT_WEIGHTS, type MealWeights } from "@/lib/meals";
+import { useAuth } from "@/contexts/AuthContext";
 
-interface Roommate { id: string; full_name: string }
+interface Roommate { id: string; full_name: string; user_id: string | null }
 interface Entry { id?: string; roommate_id: string; entry_date: string; breakfast: number; lunch: number; dinner: number; }
 type MealCounts = { breakfast: number; lunch: number; dinner: number };
 
@@ -55,7 +56,7 @@ export default function MealsPage() {
           <p className="text-sm text-muted-foreground">
             {isOwner
               ? "Log daily meals so the food bill divides fairly."
-              : "View your meals and food bill share."}
+              : "Log your own meals so your food bill share is accurate."}
           </p>
         </div>
         {isOwner && <MealSettingsButton groupId={group!.id} />}
@@ -65,7 +66,7 @@ export default function MealsPage() {
         <Card className="border-muted bg-muted/30">
           <CardContent className="flex items-center gap-3 p-3 text-xs text-muted-foreground">
             <Lock className="h-4 w-4 shrink-0" />
-            <span>Only the room owner can change meal counts. You can view your share below.</span>
+            <span>You can update your own meals. Only the room owner can change other members.</span>
           </CardContent>
         </Card>
       )}
@@ -74,7 +75,7 @@ export default function MealsPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="entry">{isOwner ? "Log meals" : "Today"}</TabsTrigger>
+          <TabsTrigger value="entry">Log meals</TabsTrigger>
           <TabsTrigger value="summary">This month</TabsTrigger>
           <TabsTrigger value="report">By month</TabsTrigger>
         </TabsList>
@@ -218,6 +219,8 @@ function MealSettingsButton({ groupId }: { groupId: string }) {
 
 function MealEntry({ groupId, isOwner }: { groupId?: string; isOwner: boolean }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? null;
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const { data: settings } = useMealSettings(groupId);
   const weights = settings?.weights ?? DEFAULT_WEIGHTS;
@@ -227,7 +230,7 @@ function MealEntry({ groupId, isOwner }: { groupId?: string; isOwner: boolean })
     enabled: !!groupId,
     queryFn: async (): Promise<Roommate[]> => {
       const { data, error } = await supabase
-        .from("roommates").select("id, full_name").eq("group_id", groupId!).order("created_at");
+        .from("roommates").select("id, full_name, user_id").eq("group_id", groupId!).order("created_at");
       if (error) throw error;
       return data || [];
     },
@@ -288,7 +291,7 @@ function MealEntry({ groupId, isOwner }: { groupId?: string; isOwner: boolean })
     },
     onError: (_err: Error, _e, ctx) => {
       if (ctx?.prev) qc.setQueryData(["meal-entries", groupId, date], ctx.prev);
-      toast.error("Couldn't save. Only the room owner can change meals.");
+      toast.error("Couldn't save. You can only change your own meals.");
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["meal-entries"] });
@@ -325,11 +328,18 @@ function MealEntry({ groupId, isOwner }: { groupId?: string; isOwner: boolean })
           {roommates.map(r => {
             const e = map.get(r.id) ?? { roommate_id: r.id, entry_date: date, breakfast: 0, lunch: 0, dinner: 0 };
             const totalMeals = (e.breakfast || 0) + (e.lunch || 0) + (e.dinner || 0);
+            const isMine = !!currentUserId && r.user_id === currentUserId;
+            const canEdit = isOwner || isMine;
             return (
-              <Card key={r.id} className="overflow-hidden">
+              <Card key={r.id} className={`overflow-hidden ${isMine ? "border-primary/40" : ""}`}>
                 <CardContent className="space-y-3 p-4">
                   <div className="flex items-center justify-between">
-                    <div className="font-semibold">{r.full_name}</div>
+                    <div className="flex items-center gap-2 font-semibold">
+                      {r.full_name}
+                      {isMine && (
+                        <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">You</span>
+                      )}
+                    </div>
                     <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary tabular-nums">
                       {totalMeals} meal{totalMeals === 1 ? "" : "s"}
                     </span>
@@ -341,7 +351,7 @@ function MealEntry({ groupId, isOwner }: { groupId?: string; isOwner: boolean })
                         label={slot[0].toUpperCase() + slot.slice(1)}
                         weight={weights[slot]}
                         value={(e as any)[slot] || 0}
-                        readOnly={!isOwner}
+                        readOnly={!canEdit}
                         onChange={(v) => upsert.mutate({ ...e, [slot]: v })}
                       />
                     ))}
@@ -439,7 +449,7 @@ function useMealSummary(groupId: string | undefined, monthStart: string, monthEn
         lunch: Number(settingsRes.data?.lunch_weight ?? 1),
         dinner: Number(settingsRes.data?.dinner_weight ?? 1),
       };
-      const roommates: Roommate[] = rmRes.data || [];
+      const roommates: Roommate[] = (rmRes.data || []).map((r: any) => ({ id: r.id, full_name: r.full_name, user_id: r.user_id ?? null }));
 
       const counts = new Map<string, MealCounts>();
       roommates.forEach(r => counts.set(r.id, { breakfast: 0, lunch: 0, dinner: 0 }));
