@@ -75,7 +75,7 @@ export default function MealsPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="entry">{isOwner ? "Log meals" : "Today"}</TabsTrigger>
+          <TabsTrigger value="entry">Log meals</TabsTrigger>
           <TabsTrigger value="summary">This month</TabsTrigger>
           <TabsTrigger value="report">By month</TabsTrigger>
         </TabsList>
